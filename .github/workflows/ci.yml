@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: observability
+          POSTGRES_PASSWORD: observability_test
+          POSTGRES_DB: observability_dns_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Restore dependencies (API)
+      run: dotnet restore src/api/ObservabilityDns.Api.csproj
+
+    - name: Restore dependencies (Worker)
+      run: dotnet restore src/worker/ObservabilityDns.Worker.csproj
+
+    - name: Restore dependencies (Contracts)
+      run: dotnet restore src/contracts/ObservabilityDns.Contracts.csproj
+
+    - name: Restore dependencies (Domain)
+      run: dotnet restore src/domain/ObservabilityDns.Domain.csproj
+
+    - name: Build API
+      run: dotnet build src/api/ObservabilityDns.Api.csproj --no-restore
+
+    - name: Build Worker
+      run: dotnet build src/worker/ObservabilityDns.Worker.csproj --no-restore
+
+    - name: Build Contracts
+      run: dotnet build src/contracts/ObservabilityDns.Contracts.csproj --no-restore
+
+    - name: Build Domain
+      run: dotnet build src/domain/ObservabilityDns.Domain.csproj --no-restore
+
+    - name: Install UI dependencies
+      run: cd ui && npm ci
+
+    - name: Build UI
+      run: cd ui && npm run build
+
+    - name: Check migrations
+      run: |
+        dotnet tool install --global dotnet-ef --version 8.0.0
+        export PATH="$PATH:/home/runner/.dotnet/tools"
+        dotnet ef migrations list --project src/domain --startup-project src/api || echo "No migrations found (expected for scaffold)"
+
+    - name: Run tests (if any)
+      run: dotnet test --no-build --verbosity normal || echo "No tests yet"

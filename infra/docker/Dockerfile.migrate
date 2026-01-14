@@ -1,0 +1,22 @@
+# Migration runner Dockerfile
+FROM mcr.microsoft.com/dotnet/sdk:8.0
+
+WORKDIR /app
+
+# Install dotnet-ef tool
+RUN dotnet tool install --global dotnet-ef --version 8.0.0
+ENV PATH="$PATH:/root/.dotnet/tools"
+
+# Copy project files
+COPY ["src/domain/ObservabilityDns.Domain.csproj", "src/domain/"]
+COPY ["src/api/ObservabilityDns.Api.csproj", "src/api/"]
+
+# Restore dependencies
+RUN dotnet restore "src/domain/ObservabilityDns.Domain.csproj"
+RUN dotnet restore "src/api/ObservabilityDns.Api.csproj"
+
+# Copy everything
+COPY . .
+
+# Run migrations
+CMD ["dotnet", "ef", "database", "update", "--project", "src/domain", "--startup-project", "src/api"]
