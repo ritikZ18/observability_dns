@@ -197,25 +197,146 @@ docker compose exec api getent hosts api
 ## Useful Commands
 
 ```bash
+# Start all services
+docker compose up -d
+
+# Stop all services
+docker compose down
+
 # Restart all services
 docker compose restart
 
 # Restart specific service
 docker compose restart api
-
-# Stop all services
-docker compose down
-
-# Stop and remove volumes
-docker compose down -v
+docker compose restart worker
+docker compose restart ui
 
 # Rebuild and restart
 docker compose up -d --build
+
+# Rebuild specific service
+docker compose build api
+docker compose build worker
 
 # View resource usage
 docker stats
 
 # Clean up
 docker compose down
+docker compose down -v  # Also removes volumes
 docker system prune -a  # Careful: removes all unused images
 ```
+
+## Testing the System
+
+### Add a Domain
+
+```bash
+# Via API
+curl -X POST http://localhost:5000/api/domains \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "google.com",
+    "intervalMinutes": 5,
+    "enabled": true
+  }'
+
+# Or use the UI at http://localhost:3000
+```
+
+### Check Probe Runs
+
+```bash
+# Get all domains
+curl http://localhost:5000/api/domains | jq
+
+# Get domain ID
+DOMAIN_ID=$(curl -s http://localhost:5000/api/domains | jq -r '.[0].id')
+
+# Get probe runs for a domain
+curl "http://localhost:5000/api/probe-runs/domains/$DOMAIN_ID?limit=10" | jq
+
+# Get all probe runs
+curl "http://localhost:5000/api/probe-runs?limit=20" | jq
+```
+
+### Check Incidents
+
+```bash
+# Get all incidents
+curl http://localhost:5000/api/incidents | jq
+
+# Get open incidents only
+curl "http://localhost:5000/api/incidents?status=0" | jq
+```
+
+### Database Queries
+
+```bash
+# Connect to database
+docker compose exec postgres psql -U observability -d observability_dns
+
+# Useful SQL queries:
+# List all domains
+SELECT id, name, enabled, interval_minutes FROM domains;
+
+# List recent probe runs
+SELECT domain_id, check_type, success, total_ms, completed_at 
+FROM probe_runs 
+ORDER BY completed_at DESC 
+LIMIT 10;
+
+# Count probe runs by domain
+SELECT d.name, COUNT(pr.id) as probe_count
+FROM domains d
+LEFT JOIN probe_runs pr ON d.id = pr.domain_id
+GROUP BY d.name;
+
+# Check incidents
+SELECT d.name, i.check_type, i.severity, i.status, i.reason
+FROM incidents i
+JOIN domains d ON i.domain_id = d.id
+ORDER BY i.started_at DESC;
+```
+
+### Worker Commands
+
+```bash
+# Check worker status
+docker compose ps worker
+
+# View worker logs
+docker compose logs worker --tail 50
+
+# Follow worker logs in real-time
+docker compose logs -f worker
+
+# Check if probes are running
+docker compose logs worker | grep -i "probe\|executing\|completed"
+```
+
+## Manual Worker Script
+
+For testing or manual probe execution, use the manual worker script:
+
+```bash
+# Make executable
+chmod +x scripts/manual-worker.sh
+
+# Set environment variables
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_NAME=observability_dns
+export DB_USER=observability
+export DB_PASSWORD=observability_dev
+export CHECK_INTERVAL=30
+
+# Run manual worker
+./scripts/manual-worker.sh
+```
+
+The manual worker will:
+- Continuously check for enabled domains
+- Execute probe jobs for each domain/check combination
+- Run until stopped (Ctrl+C or container stop)
+- Log all probe execution results

@@ -80,6 +80,10 @@ API will be available at: http://localhost:5000
 
 ### 3. Worker Setup
 
+The worker service automatically schedules and runs probe jobs using Quartz scheduler.
+
+#### Standard Worker (Scheduled)
+
 ```bash
 cd src/worker
 
@@ -90,9 +94,49 @@ dotnet restore
 export ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=observability_dns;Username=observability;Password=observability_dev"
 export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317"
 
-# Run worker
+# Run worker (uses Quartz scheduler)
 dotnet run
 ```
+
+#### Manual Worker (Continuous Execution)
+
+For testing or manual execution without scheduling:
+
+```bash
+cd src/worker
+
+# Set environment variables
+export ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=observability_dns;Username=observability;Password=observability_dev"
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317"
+export USE_MANUAL_WORKER=true
+export MANUAL_WORKER_INTERVAL=30
+
+# Run with manual worker flag
+dotnet run --use-manual-worker
+```
+
+Or use the shell script:
+
+```bash
+# Make executable
+chmod +x scripts/manual-worker.sh
+
+# Run
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_NAME=observability_dns
+export DB_USER=observability
+export DB_PASSWORD=observability_dev
+export CHECK_INTERVAL=30
+
+./scripts/manual-worker.sh
+```
+
+The manual worker:
+- Runs probe jobs continuously for all enabled domains
+- Checks for new jobs every N seconds (default: 30)
+- Runs until stopped (Ctrl+C)
+- Useful for testing without waiting for scheduled intervals
 
 ### 4. UI Setup
 
@@ -223,12 +267,53 @@ If ports are already in use:
 2. Verify proxy configuration in `vite.config.ts`
 3. Check CORS settings in API
 
+## Manual Worker
+
+The manual worker is a continuous execution mode that runs probe jobs immediately and repeatedly, useful for testing.
+
+### Using Manual Worker
+
+1. **Via Shell Script**:
+   ```bash
+   chmod +x scripts/manual-worker.sh
+   export DB_HOST=localhost
+   export DB_NAME=observability_dns
+   export DB_USER=observability
+   export DB_PASSWORD=observability_dev
+   export CHECK_INTERVAL=30
+   ./scripts/manual-worker.sh
+   ```
+
+2. **Via .NET Worker** (requires code modification):
+   - Set `USE_MANUAL_WORKER=true` environment variable
+   - Pass `--use-manual-worker` flag to worker
+   - Worker will use `ManualWorker` instead of `ProbeScheduler`
+
+3. **Via Docker Compose**:
+   ```yaml
+   manual-worker:
+     build:
+       context: .
+       dockerfile: src/worker/Dockerfile
+     environment:
+       - USE_MANUAL_WORKER=true
+       - MANUAL_WORKER_INTERVAL=30
+     command: ["dotnet", "ObservabilityDns.Worker.dll", "--use-manual-worker"]
+   ```
+
+### Worker Modes
+
+- **Scheduled Worker** (default): Uses Quartz scheduler to run probes at specified intervals per domain
+- **Manual Worker**: Continuously polls and executes all enabled probes every N seconds
+
 ## Next Steps
 
-1. Add your first domain to monitor
-2. Configure alert rules
-3. Set up Slack/Email notifications
-4. Explore Jaeger traces and Prometheus metrics
+1. Add your first domain to monitor via UI or API
+2. Verify probe runs are executing (check worker logs)
+3. View results in the observability dashboard
+4. Configure alert rules (future feature)
+5. Set up Slack/Email notifications (future feature)
+6. Explore Jaeger traces and Prometheus metrics
 
 ## Development Workflow
 
