@@ -68,6 +68,7 @@ builder.Services.AddDbContext<ObservabilityDnsDbContext>(options =>
 
 // Register services
 builder.Services.AddScoped<ObservabilityDns.Api.Services.DomainService>();
+builder.Services.AddScoped<ObservabilityDns.Api.Services.GroupService>();
 builder.Services.AddScoped<ObservabilityDns.Api.Services.ProbeRunService>();
 builder.Services.AddScoped<ObservabilityDns.Api.Services.WebsiteInfoService>();
 

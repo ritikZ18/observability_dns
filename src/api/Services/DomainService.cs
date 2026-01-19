@@ -18,9 +18,18 @@ public class DomainService
         _logger = logger;
     }
 
-    public async Task<List<DomainDto>> GetAllDomainsAsync()
+    public async Task<List<DomainDto>> GetAllDomainsAsync(Guid? groupId = null)
     {
-        var domains = await _dbContext.Domains
+        var query = _dbContext.Domains
+            .Include(d => d.Group)
+            .AsQueryable();
+
+        if (groupId.HasValue)
+        {
+            query = query.Where(d => d.GroupId == groupId.Value);
+        }
+
+        var domains = await query
             .OrderBy(d => d.Name)
             .ToListAsync();
 
@@ -30,6 +39,10 @@ public class DomainService
             Name = d.Name,
             Enabled = d.Enabled,
             IntervalMinutes = d.IntervalMinutes,
+            GroupId = d.GroupId,
+            GroupName = d.Group?.Name,
+            GroupColor = d.Group?.Color,
+            Icon = d.Icon,
             CreatedAt = d.CreatedAt,
             UpdatedAt = d.UpdatedAt
         }).ToList();
@@ -39,6 +52,7 @@ public class DomainService
     {
         var domain = await _dbContext.Domains
             .Include(d => d.Checks)
+            .Include(d => d.Group)
             .FirstOrDefaultAsync(d => d.Id == id);
 
         if (domain == null)
@@ -61,6 +75,10 @@ public class DomainService
             Name = domain.Name,
             Enabled = domain.Enabled,
             IntervalMinutes = domain.IntervalMinutes,
+            GroupId = domain.GroupId,
+            GroupName = domain.Group?.Name,
+            GroupColor = domain.Group?.Color,
+            Icon = domain.Icon,
             CreatedAt = domain.CreatedAt,
             UpdatedAt = domain.UpdatedAt,
             Checks = domain.Checks.Select(c => new CheckDto
@@ -115,6 +133,8 @@ public class DomainService
             Name = normalizedName,
             Enabled = request.Enabled,
             IntervalMinutes = request.IntervalMinutes,
+            Icon = request.Icon?.Trim(),
+            GroupId = request.GroupId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -141,6 +161,10 @@ public class DomainService
             Name = domain.Name,
             Enabled = domain.Enabled,
             IntervalMinutes = domain.IntervalMinutes,
+            GroupId = domain.GroupId,
+            GroupName = null, // Will be populated if group is loaded
+            GroupColor = null,
+            Icon = domain.Icon,
             CreatedAt = domain.CreatedAt,
             UpdatedAt = domain.UpdatedAt
         };
@@ -157,6 +181,12 @@ public class DomainService
 
         if (request.IntervalMinutes.HasValue)
             domain.IntervalMinutes = request.IntervalMinutes.Value;
+
+        if (request.Icon != null)
+            domain.Icon = string.IsNullOrEmpty(request.Icon) ? null : request.Icon.Trim();
+
+        if (request.GroupId.HasValue)
+            domain.GroupId = request.GroupId;
 
         domain.UpdatedAt = DateTime.UtcNow;
 

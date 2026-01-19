@@ -10,6 +10,7 @@ public class ObservabilityDnsDbContext : Microsoft.EntityFrameworkCore.DbContext
     {
     }
 
+    public DbSet<Entities.DomainGroup> DomainGroups { get; set; }
     public DbSet<Entities.Domain> Domains { get; set; }
     public DbSet<Entities.Check> Checks { get; set; }
     public DbSet<Entities.ProbeRun> ProbeRuns { get; set; }
@@ -22,11 +23,23 @@ public class ObservabilityDnsDbContext : Microsoft.EntityFrameworkCore.DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // DomainGroup configuration
+        modelBuilder.Entity<Entities.DomainGroup>(entity =>
+        {
+            entity.HasIndex(e => e.Name).IsUnique();
+            entity.HasIndex(e => e.Enabled);
+        });
+
         // Domain configuration
         modelBuilder.Entity<Entities.Domain>(entity =>
         {
             entity.HasIndex(e => e.Name).IsUnique();
             entity.HasIndex(e => e.Enabled);
+            entity.HasIndex(e => e.GroupId);
+            entity.HasOne(e => e.Group)
+                .WithMany(g => g.Domains)
+                .HasForeignKey(e => e.GroupId)
+                .OnDelete(DeleteBehavior.SetNull); // Set GroupId to null if group is deleted
         });
 
         // Check configuration

@@ -6,9 +6,10 @@ import '../App.css';
 
 interface ObservabilityTableProps {
   onDomainClick?: (domainId: string) => void;
+  groupId?: string;
 }
 
-export default function ObservabilityTable({ onDomainClick }: ObservabilityTableProps) {
+export default function ObservabilityTable({ onDomainClick, groupId }: ObservabilityTableProps) {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [probeRuns, setProbeRuns] = useState<Map<string, ProbeRun[]>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -17,11 +18,15 @@ export default function ObservabilityTable({ onDomainClick }: ObservabilityTable
   const loadData = async () => {
     try {
       const domainsData = await domainsApi.getAll();
-      setDomains(domainsData);
+      // Filter by group if specified
+      const filteredDomains = groupId 
+        ? domainsData.filter(d => d.groupId === groupId)
+        : domainsData;
+      setDomains(filteredDomains);
 
-      // Load recent probe runs for each domain
+      // Load recent probe runs for each domain (use filtered domains)
       const runsMap = new Map<string, ProbeRun[]>();
-      for (const domain of domainsData) {
+      for (const domain of filteredDomains) {
         try {
           const runs = await probeRunsApi.getByDomain(domain.id, undefined, 3);
           runsMap.set(domain.id, runs);
@@ -42,7 +47,7 @@ export default function ObservabilityTable({ onDomainClick }: ObservabilityTable
     // Refresh every 30 seconds
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [groupId]); // Reload when group filter changes
 
   const getLatestRun = (domainId: string, checkType: CheckType): ProbeRun | undefined => {
     const runs = probeRuns.get(domainId) || [];
@@ -125,16 +130,48 @@ export default function ObservabilityTable({ onDomainClick }: ObservabilityTable
                 style={{ cursor: onDomainClick ? 'pointer' : 'default' }}
               >
                 <td>
-                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {domain.name}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                    <span style={{ color: 'var(--blue-bright)' }}>interval:</span> {domain.intervalMinutes}m
-                    {!domain.enabled && (
-                      <span style={{ color: 'var(--status-warning)', marginLeft: '0.5rem' }}>
-                        [DISABLED]
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    {domain.icon && (
+                      <span style={{ 
+                        fontSize: '16px',
+                        display: 'inline-block',
+                        minWidth: '20px',
+                        textAlign: 'center'
+                      }} title={domain.icon}>
+                        {domain.icon}
                       </span>
                     )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {domain.name}
+                        {domain.groupName && (
+                          <span 
+                            className="terminal-badge"
+                            style={{
+                              fontSize: '10px',
+                              padding: '0.15rem 0.5rem',
+                              backgroundColor: domain.groupColor || 'var(--bg-secondary)',
+                              color: 'var(--text-primary)',
+                              border: `1px solid ${domain.groupColor || 'var(--border-color)'}`,
+                              borderRadius: '3px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px'
+                            }}
+                            title={`Group: ${domain.groupName}`}
+                          >
+                            {domain.groupName}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                        <span style={{ color: 'var(--blue-bright)' }}>interval:</span> {domain.intervalMinutes}m
+                        {!domain.enabled && (
+                          <span style={{ color: 'var(--status-warning)', marginLeft: '0.5rem' }}>
+                            [DISABLED]
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </td>
                 <td>

@@ -18,9 +18,9 @@ public class DomainsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<DomainDto>>> GetAllDomains()
+    public async Task<ActionResult<List<DomainDto>>> GetAllDomains([FromQuery] Guid? groupId = null)
     {
-        var domains = await _domainService.GetAllDomainsAsync();
+        var domains = await _domainService.GetAllDomainsAsync(groupId);
         return Ok(domains);
     }
 

@@ -289,10 +289,20 @@
   color: var(--text-primary);
 }
 
-/* Loading spinner - terminal style */
+/* Loading spinner - neon green terminal style */
 .terminal-loading {
-  color: var(--green-bright);
-  font-size: 13px;
+  display: inline-block;
+  color: #00ff41;
+  font-size: 16px;
+  font-weight: 600;
+  text-shadow: 
+    0 0 5px #00ff41,
+    0 0 10px #00ff41,
+    0 0 15px #00ff41,
+    0 0 20px #00ff41;
+  animation: pulse-glow 1.5s ease-in-out infinite;
+  margin-left: 0.5rem;
+  letter-spacing: 2px;
 }
 
 .terminal-loading::after {
@@ -304,6 +314,50 @@
   0%, 20% { content: '.'; }
   40% { content: '..'; }
   60%, 100% { content: '...'; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    text-shadow: 
+      0 0 5px #00ff41,
+      0 0 10px #00ff41,
+      0 0 15px #00ff41,
+      0 0 20px #00ff41;
+  }
+  50% {
+    opacity: 0.8;
+    text-shadow: 
+      0 0 2px #00ff41,
+      0 0 5px #00ff41,
+      0 0 8px #00ff41,
+      0 0 12px #00ff41;
+  }
+}
+
+/* Full page loading */
+.terminal-loading-full {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  color: #00ff41;
+  font-size: 18px;
+  font-weight: 600;
+  text-shadow: 
+    0 0 5px #00ff41,
+    0 0 10px #00ff41,
+    0 0 15px #00ff41,
+    0 0 20px #00ff41;
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+.terminal-loading-full::after {
+  content: 'LOADING';
+  display: block;
+  margin-top: 1rem;
+  animation: dots 1.5s steps(4, end) infinite;
 }
 
 /* Error message - terminal style */

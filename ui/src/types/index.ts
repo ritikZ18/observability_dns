@@ -36,6 +36,10 @@ export interface Domain {
   name: string;
   enabled: boolean;
   intervalMinutes: number;
+  groupId?: string;
+  groupName?: string;
+  groupColor?: string;
+  icon?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -114,9 +118,57 @@ export interface CreateDomainRequest {
   name: string;
   intervalMinutes: number;
   enabled: boolean;
+  icon?: string;
+  groupId?: string;
 }
 
 export interface UpdateDomainRequest {
   enabled?: boolean;
   intervalMinutes?: number;
+  icon?: string;
+  groupId?: string;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  enabled: boolean;
+  domainCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GroupDetail extends Group {
+  domains: Domain[];
+  statistics?: GroupStatistics;
+}
+
+export interface GroupStatistics {
+  totalDomains: number;
+  enabledDomains: number;
+  totalProbeRuns: number;
+  successfulRuns: number;
+  failedRuns: number;
+  averageLatency: number;
+  openIncidents: number;
+  lastProbeRun?: string;
+}
+
+export interface CreateGroupRequest {
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  enabled: boolean;
+}
+
+export interface UpdateGroupRequest {
+  name?: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  enabled?: boolean;
 }

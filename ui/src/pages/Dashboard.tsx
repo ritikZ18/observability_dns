@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DomainForm from '../components/DomainForm';
+import GroupForm from '../components/GroupForm';
 import ObservabilityTable from '../components/ObservabilityTable';
-import { domainsApi, probeRunsApi, incidentsApi } from '../services/api';
-import { IncidentStatus } from '../types';
+import BackupRestore from '../components/BackupRestore';
+import { domainsApi, probeRunsApi, incidentsApi, groupsApi } from '../services/api';
+import { IncidentStatus, type Group } from '../types';
 import '../App.css';
 
 export default function Dashboard() {
@@ -15,11 +17,19 @@ export default function Dashboard() {
     openIncidents: 0,
     totalProbeRuns: 0
   });
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | undefined>(undefined);
+  const [showGroupForm, setShowGroupForm] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const loadSummary = async () => {
     try {
-      const domainsData = await domainsApi.getAll();
+      const [domainsData, groupsData] = await Promise.all([
+        domainsApi.getAll(),
+        groupsApi.getAll().catch(() => []) // Groups are optional
+      ]);
+
+      setGroups(groupsData);
 
       // Load recent probe runs for summary
       let healthyCount = 0;
@@ -70,6 +80,11 @@ export default function Dashboard() {
   }, []);
 
   const handleDomainAdded = () => {
+    loadSummary();
+  };
+
+  const handleGroupAdded = () => {
+    setShowGroupForm(false);
     loadSummary();
   };
 
@@ -168,6 +183,91 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Groups Section */}
+        <div className="terminal-card" style={{ marginBottom: '2rem' }}>
+          <div className="terminal-card-header">
+            <div className="terminal-card-title">Groups</div>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <select
+                className="terminal-select"
+                value={selectedGroupId || ''}
+                onChange={(e) => setSelectedGroupId(e.target.value || undefined)}
+                style={{ fontSize: '12px', padding: '0.25rem 0.5rem' }}
+              >
+                <option value="">All Groups</option>
+                {groups.filter(g => g.enabled).map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name} ({group.domainCount})
+                  </option>
+                ))}
+              </select>
+              {!showGroupForm && (
+                <button
+                  className="terminal-button primary"
+                  onClick={() => setShowGroupForm(true)}
+                  style={{ fontSize: '11px', padding: '0.25rem 0.75rem' }}
+                >
+                  + CREATE GROUP
+                </button>
+              )}
+            </div>
+          </div>
+
+          {showGroupForm ? (
+            <GroupForm 
+              onGroupAdded={handleGroupAdded}
+              onCancel={() => setShowGroupForm(false)}
+            />
+          ) : (
+            <div>
+              {groups.length === 0 ? (
+                <div style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '13px', textAlign: 'center' }}>
+                  No groups created yet. Create a group to organize your domains.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  {groups.filter(g => g.enabled).map((group) => (
+                    <div
+                      key={group.id}
+                      onClick={() => navigate(`/group/${group.id}`)}
+                      style={{
+                        padding: '0.75rem 1rem',
+                        backgroundColor: 'var(--bg-tertiary)',
+                        border: `1px solid ${group.color || 'var(--border-color)'}`,
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        transition: 'all 0.2s',
+                        boxShadow: `0 0 10px ${group.color || 'transparent'}`
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = `0 0 20px ${group.color || 'var(--border-color)'}`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = `0 0 10px ${group.color || 'transparent'}`;
+                      }}
+                    >
+                      {group.icon && <span style={{ fontSize: '18px' }}>{group.icon}</span>}
+                      <div>
+                        <div style={{ fontWeight: 600, color: group.color || 'var(--text-primary)' }}>
+                          {group.name}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                          {group.domainCount} domain{group.domainCount !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Add Domain Form */}
         <div className="terminal-card" style={{ marginBottom: '2rem' }}>
           <div className="terminal-card-header">
@@ -184,8 +284,14 @@ export default function Dashboard() {
               Click any domain for detailed view
             </div>
           </div>
-          <ObservabilityTable onDomainClick={(domainId) => navigate(`/domain/${domainId}`)} />
+          <ObservabilityTable 
+            onDomainClick={(domainId) => navigate(`/domain/${domainId}`)}
+            groupId={selectedGroupId}
+          />
         </div>
+
+        {/* Backup & Restore */}
+        <BackupRestore />
       </div>
     </div>
   );
