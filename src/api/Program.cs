@@ -1,76 +1,128 @@
-// TODO: Implement API startup and configuration
-//
-// Example structure:
-namespace ObservabilityDns.Api;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using ObservabilityDns.Domain.DbContext;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+using System.Text.Json.Serialization;
 
-public class Program
-{
-    public static void Main(string[] args)
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
     {
-        // TODO: Implement API startup
-        // var builder = WebApplication.CreateBuilder(args);
-        // ... (see comments below)
-    }
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new() { Title = "DNS & TLS Observatory API", Version = "v1" });
+});
+
+// Add CORS for UI
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:3000")
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
+
+// Add health checks
+builder.Services.AddHealthChecks()
+    .AddCheck("self", () => HealthCheckResult.Healthy("API is healthy"))
+    .AddDbContextCheck<ObservabilityDnsDbContext>("database", tags: new[] { "ready" });
+
+// Add OpenTelemetry
+var otelEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://otel-collector:4317";
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracerProviderBuilder =>
+    {
+        tracerProviderBuilder
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(options =>
+            {
+                options.Endpoint = new Uri(otelEndpoint);
+            });
+    })
+    .WithMetrics(metricsProviderBuilder =>
+    {
+        metricsProviderBuilder
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(options =>
+            {
+                options.Endpoint = new Uri(otelEndpoint);
+            });
+    });
+
+// Add DbContext
+builder.Services.AddDbContext<ObservabilityDnsDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Register services
+builder.Services.AddScoped<ObservabilityDns.Api.Services.DomainService>();
+builder.Services.AddScoped<ObservabilityDns.Api.Services.ProbeRunService>();
+builder.Services.AddScoped<ObservabilityDns.Api.Services.WebsiteInfoService>();
+
+var app = builder.Build();
+
+// Configure pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
-//
-// var builder = WebApplication.CreateBuilder(args);
-//
-// // Add services
-// builder.Services.AddControllers();
-// builder.Services.AddEndpointsApiExplorer();
-// builder.Services.AddSwaggerGen();
-//
-// // Add health checks
-// builder.Services.AddHealthChecks()
-//     .AddCheck("self", () => HealthCheckResult.Healthy())
-//     .AddDbContextCheck<ObservabilityDnsDbContext>("database");
-//
-// // Add OpenTelemetry
-// builder.Services.AddOpenTelemetry()
-//     .WithTracing(builder => builder
-//         .AddAspNetCoreInstrumentation()
-//         .AddHttpClientInstrumentation()
-//         .AddOtlpExporter(options =>
-//         {
-//             options.Endpoint = new Uri(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://localhost:4317");
-//         }))
-//     .WithMetrics(builder => builder
-//         .AddAspNetCoreInstrumentation()
-//         .AddHttpClientInstrumentation()
-//         .AddOtlpExporter(options =>
-//         {
-//             options.Endpoint = new Uri(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://localhost:4317");
-//         }));
-//
-// // Add DbContext
-// builder.Services.AddDbContext<ObservabilityDnsDbContext>(options =>
-//     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-//
-// var app = builder.Build();
-//
-// // Configure pipeline
-// if (app.Environment.IsDevelopment())
-// {
-//     app.UseSwagger();
-//     app.UseSwaggerUI();
-// }
-//
-// app.UseHttpsRedirection();
-// app.UseAuthorization();
-// app.MapControllers();
-//
-// // Health check endpoints
-// app.MapHealthChecks("/healthz", new HealthCheckOptions
-// {
-//     Predicate = _ => true,
-//     ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-// });
-//
-// app.MapHealthChecks("/readyz", new HealthCheckOptions
-// {
-//     Predicate = check => check.Tags.Contains("ready"),
-//     ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-// });
-//
-// app.Run();
+app.UseCors();
+app.UseAuthorization();
+app.MapControllers();
+
+// Health check endpoints
+app.MapHealthChecks("/healthz", new HealthCheckOptions
+{
+    Predicate = _ => true,
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var result = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                exception = e.Value.Exception?.Message,
+                duration = e.Value.Duration.ToString()
+            })
+        });
+        await context.Response.WriteAsync(result);
+    }
+});
+
+app.MapHealthChecks("/readyz", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var result = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString()
+            })
+        });
+        await context.Response.WriteAsync(result);
+    }
+});
+
+app.Run();

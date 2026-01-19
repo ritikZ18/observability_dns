@@ -185,6 +185,15 @@ docker compose exec api getent hosts api
 4. **Add domain entities** in `src/domain/Entities/`
 5. **Create probe runners** in `src/worker/Probers/`
 
+## Testing with Live Websites
+
+**See [TESTING_LIVE_WEBSITES.md](docs/TESTING_LIVE_WEBSITES.md) for complete guide on:**
+- How to add domains to monitor
+- Recommended test domains (google.com, badssl.com, etc.)
+- Testing different scenarios (DNS failures, TLS issues, HTTP errors)
+- Monitoring your own infrastructure
+- Example test scripts
+
 ## Useful Commands
 
 ```bash

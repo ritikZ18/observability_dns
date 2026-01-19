@@ -13,13 +13,11 @@ COPY . .
 WORKDIR "/src/src/api"
 RUN dotnet build "ObservabilityDns.Api.csproj" -c Release -o /app/build --runtime linux-musl-x64 --no-restore
 
-# Publish stage with trimming and AOT optimizations
+# Publish stage
 FROM build AS publish
 RUN dotnet publish "ObservabilityDns.Api.csproj" -c Release -o /app/publish \
     --runtime linux-musl-x64 \
     --self-contained false \
-    /p:PublishTrimmed=true \
-    /p:TrimMode=link \
     /p:UseAppHost=false
 
 # Runtime stage - Alpine-based for smaller image

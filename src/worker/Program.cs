@@ -1,61 +1,71 @@
-// TODO: Implement Worker Service startup and configuration
-//
-// Example structure:
-namespace ObservabilityDns.Worker;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using ObservabilityDns.Domain.DbContext;
+using ObservabilityDns.Worker.Scheduler;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+using Quartz;
 
-public class Program
+var builder = Host.CreateApplicationBuilder(args);
+
+// Add services
+builder.Services.AddHostedService<ProbeScheduler>();
+
+// Add Quartz scheduler
+builder.Services.AddQuartz(q =>
 {
-    public static void Main(string[] args)
+    q.UseSimpleTypeLoader();
+    q.UseInMemoryStore();
+    q.UseDefaultThreadPool(tp =>
     {
-        // TODO: Implement Worker Service startup
-        // var builder = Host.CreateApplicationBuilder(args);
-        // ... (see comments below)
-    }
-}
+        tp.MaxConcurrency = 10;
+    });
+});
 
-//
-// var builder = Host.CreateApplicationBuilder(args);
-//
-// // Add services
-// builder.Services.AddHostedService<Worker>();
-//
-// // Add Quartz scheduler
-// builder.Services.AddQuartz(q =>
-// {
-//     q.UseMicrosoftDependencyInjection();
-//     // Configure jobs for DNS, TLS, HTTP probes
-// });
-// builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
-//
-// // Add OpenTelemetry
-// builder.Services.AddOpenTelemetry()
-//     .WithTracing(builder => builder
-//         .AddHttpClientInstrumentation()
-//         .AddOtlpExporter(options =>
-//         {
-//             options.Endpoint = new Uri(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://localhost:4317");
-//         }))
-//     .WithMetrics(builder => builder
-//         .AddHttpClientInstrumentation()
-//         .AddOtlpExporter(options =>
-//         {
-//             options.Endpoint = new Uri(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://localhost:4317");
-//         }));
-//
-// // Add DbContext
-// builder.Services.AddDbContext<ObservabilityDnsDbContext>(options =>
-//     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-//
-// // Register probe runners
-// builder.Services.AddScoped<IDnsProbeRunner, DnsProbeRunner>();
-// builder.Services.AddScoped<ITlsProbeRunner, TlsProbeRunner>();
-// builder.Services.AddScoped<IHttpProbeRunner, HttpProbeRunner>();
-//
-// // Health check logging (write to database or log file)
-// var host = builder.Build();
-//
-// // Log worker startup
-// var logger = host.Services.GetRequiredService<ILogger<Program>>();
-// logger.LogInformation("Observability DNS Worker starting...");
-//
-// host.Run();
+builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
+
+// Add OpenTelemetry
+var otelEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://otel-collector:4317";
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracerProviderBuilder =>
+    {
+        tracerProviderBuilder
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(options =>
+            {
+                options.Endpoint = new Uri(otelEndpoint);
+            });
+    })
+    .WithMetrics(metricsProviderBuilder =>
+    {
+        metricsProviderBuilder
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(options =>
+            {
+                options.Endpoint = new Uri(otelEndpoint);
+            });
+    });
+
+// Add DbContext
+builder.Services.AddDbContext<ObservabilityDnsDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Add HttpClient for HTTP probes
+builder.Services.AddHttpClient();
+
+// Register probe runners
+builder.Services.AddScoped<ObservabilityDns.Worker.Probers.IDnsProbeRunner, ObservabilityDns.Worker.Probers.Dns.DnsProbeRunner>();
+builder.Services.AddScoped<ObservabilityDns.Worker.Probers.ITlsProbeRunner, ObservabilityDns.Worker.Probers.Tls.TlsProbeRunner>();
+builder.Services.AddScoped<ObservabilityDns.Worker.Probers.IHttpProbeRunner, ObservabilityDns.Worker.Probers.Http.HttpProbeRunner>();
+
+// Register notification processor
+builder.Services.AddHostedService<ObservabilityDns.Worker.Services.NotificationProcessor>();
+
+var host = builder.Build();
+
+// Log worker startup
+var logger = host.Services.GetRequiredService<ILogger<Program>>();
+logger.LogInformation("Observability DNS Worker starting...");
+
+host.Run();

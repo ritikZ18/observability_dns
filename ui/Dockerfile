@@ -2,7 +2,7 @@
 FROM node:18-alpine AS dev
 WORKDIR /app
 COPY ui/package*.json ./
-RUN npm ci --only=production=false && npm cache clean --force
+RUN npm install && npm cache clean --force
 COPY ui/ .
 EXPOSE 3000
 CMD ["npm", "run", "dev", "--", "--host"]
@@ -13,7 +13,7 @@ WORKDIR /app
 
 # Copy package files and install dependencies
 COPY ui/package*.json ./
-RUN npm ci --only=production=false && npm cache clean --force
+RUN npm install && npm cache clean --force
 
 # Copy source and build
 COPY ui/ .
