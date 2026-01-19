@@ -1,7 +1,21 @@
 export enum CheckType {
-  DNS = 0,
-  TLS = 1,
-  HTTP = 2
+  DNS = 'DNS',
+  TLS = 'TLS',
+  HTTP = 'HTTP'
+}
+
+// Helper function to convert string to CheckType
+export function stringToCheckType(value: string): CheckType {
+  switch (value.toUpperCase()) {
+    case 'DNS':
+      return CheckType.DNS;
+    case 'TLS':
+      return CheckType.TLS;
+    case 'HTTP':
+      return CheckType.HTTP;
+    default:
+      return CheckType.DNS;
+  }
 }
 
 export enum IncidentStatus {

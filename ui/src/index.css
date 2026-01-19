@@ -1,35 +1,164 @@
+/* Terminal/Linux-style theme */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+  /* Terminal color scheme - dark theme */
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d30;
+  --bg-hover: #2a2d2e;
+  
+  /* Text colors */
+  --text-primary: #d4d4d4;
+  --text-secondary: #858585;
+  --text-muted: #6a6a6a;
+  
+  /* Terminal accent colors */
+  --green: #4ec9b0;
+  --green-bright: #89d185;
+  --red: #f48771;
+  --red-bright: #f48771;
+  --yellow: #dcdcaa;
+  --blue: #569cd6;
+  --blue-bright: #4fc1ff;
+  --cyan: #4ec9b0;
+  --magenta: #c586c0;
+  --orange: #ce9178;
+  
+  /* Status colors */
+  --status-success: var(--green-bright);
+  --status-warning: var(--yellow);
+  --status-error: var(--red);
+  --status-info: var(--blue-bright);
+  
+  /* Borders and dividers */
+  --border-color: #3e3e42;
+  --border-hover: #505050;
+  
+  /* Terminal cursor/prompt */
+  --cursor-color: var(--green-bright);
+  --prompt-color: var(--blue-bright);
+  
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
+  
+  color-scheme: dark;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
 #root {
   width: 100%;
-  margin: 0 auto;
-  text-align: left;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
+/* Scrollbar styling - terminal style */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border: 2px solid var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* Code and pre styling */
+code, pre {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+}
+
+/* Selection styling */
+::selection {
+  background-color: var(--blue);
+  color: var(--bg-primary);
+}
+
+::-moz-selection {
+  background-color: var(--blue);
+  color: var(--bg-primary);
+}
+
+/* Terminal-style input focus */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid var(--cursor-color);
+  outline-offset: 2px;
+}
+
+/* Terminal-style button hover */
+button {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+/* Link styling */
+a {
+  color: var(--blue-bright);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--cyan);
+  text-decoration: underline;
+}
+
+/* Terminal prompt style */
+.terminal-prompt {
+  color: var(--prompt-color);
+  font-weight: 600;
+}
+
+.terminal-prompt::before {
+  content: '$ ';
+  color: var(--green-bright);
+}
+
+/* Terminal cursor blink animation */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.terminal-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background-color: var(--cursor-color);
+  animation: blink 1s infinite;
+  margin-left: 2px;
+  vertical-align: middle;
 }

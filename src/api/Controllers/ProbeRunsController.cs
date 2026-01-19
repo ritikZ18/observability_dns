@@ -6,7 +6,7 @@ using ObservabilityDns.Contracts.Enums;
 namespace ObservabilityDns.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/probe-runs")]
 public class ProbeRunsController : ControllerBase
 {
     private readonly ProbeRunService _probeRunService;

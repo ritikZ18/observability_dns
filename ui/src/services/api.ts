@@ -10,7 +10,7 @@ import type {
   CheckType
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -63,7 +63,7 @@ export const probeRunsApi = {
 
 // Incidents API
 export const incidentsApi = {
-  getAll: async (status?: IncidentStatus, domainId?: string): Promise<Incident[]> => {
+  getAll: async (status?: number, domainId?: string): Promise<Incident[]> => {
     const params = new URLSearchParams();
     if (status !== undefined) params.append('status', status.toString());
     if (domainId) params.append('domainId', domainId);

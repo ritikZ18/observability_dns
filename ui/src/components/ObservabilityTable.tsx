@@ -2,8 +2,13 @@ import { useEffect, useState } from 'react';
 import { domainsApi, probeRunsApi } from '../services/api';
 import type { Domain, ProbeRun } from '../types';
 import { CheckType } from '../types';
+import '../App.css';
 
-export default function ObservabilityTable() {
+interface ObservabilityTableProps {
+  onDomainClick?: (domainId: string) => void;
+}
+
+export default function ObservabilityTable({ onDomainClick }: ObservabilityTableProps) {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [probeRuns, setProbeRuns] = useState<Map<string, ProbeRun[]>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -18,7 +23,7 @@ export default function ObservabilityTable() {
       const runsMap = new Map<string, ProbeRun[]>();
       for (const domain of domainsData) {
         try {
-          const runs = await probeRunsApi.getByDomain(domain.id, undefined, 1);
+          const runs = await probeRunsApi.getByDomain(domain.id, undefined, 3);
           runsMap.set(domain.id, runs);
         } catch (err) {
           // Ignore errors for individual domain runs
@@ -44,17 +49,18 @@ export default function ObservabilityTable() {
     return runs.find(r => r.checkType === checkType);
   };
 
-  const getStatusColor = (success: boolean | undefined): string => {
-    if (success === undefined) return '#999';
-    return success ? '#28a745' : '#dc3545';
+  const getStatusIndicator = (success: boolean | undefined): string => {
+    if (success === undefined) return 'unknown';
+    return success ? 'success' : 'error';
   };
 
   const getStatusText = (success: boolean | undefined): string => {
     if (success === undefined) return 'Unknown';
-    return success ? 'Healthy' : 'Unhealthy';
+    return success ? 'OK' : 'FAIL';
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation(); // Prevent row click
     if (!confirm('Are you sure you want to delete this domain?')) return;
     try {
       await domainsApi.delete(id);
@@ -65,30 +71,39 @@ export default function ObservabilityTable() {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="terminal-loading">Loading observability data</div>;
   }
 
   if (error) {
-    return <div style={{ color: 'red' }}>Error: {error}</div>;
+    return <div className="terminal-error">Error: {error}</div>;
   }
 
   if (domains.length === 0) {
-    return <div>No domains configured. Add a domain to start monitoring.</div>;
+    return (
+      <div style={{ 
+        padding: '2rem', 
+        textAlign: 'center', 
+        color: 'var(--text-secondary)',
+        fontSize: '13px'
+      }}>
+        <div style={{ marginBottom: '0.5rem' }}>No domains configured.</div>
+        <div>Add a domain above to start monitoring.</div>
+      </div>
+    );
   }
 
   return (
     <div>
-      <h2>Observability Dashboard</h2>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem' }}>
+      <table className="terminal-table">
         <thead>
-          <tr style={{ background: '#f0f0f0' }}>
-            <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #ddd' }}>Domain</th>
-            <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #ddd' }}>Status</th>
-            <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #ddd' }}>DNS</th>
-            <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #ddd' }}>TLS</th>
-            <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #ddd' }}>HTTP</th>
-            <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #ddd' }}>Last Check</th>
-            <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #ddd' }}>Actions</th>
+          <tr>
+            <th>Domain</th>
+            <th>DNS</th>
+            <th>TLS</th>
+            <th>HTTP</th>
+            <th>Status</th>
+            <th>Last Check</th>
+            <th style={{ textAlign: 'right' }}>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -100,81 +115,115 @@ export default function ObservabilityTable() {
               .filter(r => r !== undefined)
               .sort((a, b) => new Date(b!.completedAt).getTime() - new Date(a!.completedAt).getTime())[0];
 
+            const overallSuccess = latestRun?.success ?? undefined;
+            const statusIndicator = getStatusIndicator(overallSuccess);
+
             return (
-              <tr key={domain.id}>
-                <td style={{ padding: '0.75rem', border: '1px solid #ddd' }}>
-                  <strong>{domain.name}</strong>
-                  <br />
-                  <small style={{ color: '#666' }}>
-                    Every {domain.intervalMinutes} min
-                    {!domain.enabled && ' (Disabled)'}
-                  </small>
+              <tr 
+                key={domain.id}
+                onClick={() => onDomainClick?.(domain.id)}
+                style={{ cursor: onDomainClick ? 'pointer' : 'default' }}
+              >
+                <td>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {domain.name}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                    <span style={{ color: 'var(--blue-bright)' }}>interval:</span> {domain.intervalMinutes}m
+                    {!domain.enabled && (
+                      <span style={{ color: 'var(--status-warning)', marginLeft: '0.5rem' }}>
+                        [DISABLED]
+                      </span>
+                    )}
+                  </div>
                 </td>
-                <td style={{ padding: '0.75rem', border: '1px solid #ddd' }}>
-                  <span style={{ color: getStatusColor(latestRun?.success) }}>
-                    {getStatusText(latestRun?.success)}
-                  </span>
-                </td>
-                <td style={{ padding: '0.75rem', border: '1px solid #ddd' }}>
+                <td>
                   {dnsRun ? (
-                    <div>
-                      <span style={{ color: getStatusColor(dnsRun.success) }}>
-                        {dnsRun.success ? '✓' : '✗'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className={`status-indicator ${getStatusIndicator(dnsRun.success)}`}></span>
+                      <span style={{ 
+                        color: dnsRun.success ? 'var(--status-success)' : 'var(--status-error)',
+                        fontSize: '12px',
+                        fontWeight: 500
+                      }}>
+                        {dnsRun.success ? 'OK' : 'FAIL'}
                       </span>
-                      {dnsRun.totalMs !== undefined && ` ${dnsRun.totalMs}ms`}
+                      {dnsRun.totalMs !== undefined && (
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                          {dnsRun.totalMs}ms
+                        </span>
+                      )}
                     </div>
                   ) : (
-                    <span style={{ color: '#999' }}>-</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>-</span>
                   )}
                 </td>
-                <td style={{ padding: '0.75rem', border: '1px solid #ddd' }}>
+                <td>
                   {tlsRun ? (
-                    <div>
-                      <span style={{ color: getStatusColor(tlsRun.success) }}>
-                        {tlsRun.success ? '✓' : '✗'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className={`status-indicator ${getStatusIndicator(tlsRun.success)}`}></span>
+                      <span style={{ 
+                        color: tlsRun.success ? 'var(--status-success)' : 'var(--status-error)',
+                        fontSize: '12px',
+                        fontWeight: 500
+                      }}>
+                        {tlsRun.success ? 'OK' : 'FAIL'}
                       </span>
-                      {tlsRun.totalMs !== undefined && ` ${tlsRun.totalMs}ms`}
+                      {tlsRun.totalMs !== undefined && (
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                          {tlsRun.totalMs}ms
+                        </span>
+                      )}
                     </div>
                   ) : (
-                    <span style={{ color: '#999' }}>-</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>-</span>
                   )}
                 </td>
-                <td style={{ padding: '0.75rem', border: '1px solid #ddd' }}>
+                <td>
                   {httpRun ? (
-                    <div>
-                      <span style={{ color: getStatusColor(httpRun.success) }}>
-                        {httpRun.success ? '✓' : '✗'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className={`status-indicator ${getStatusIndicator(httpRun.success)}`}></span>
+                      <span style={{ 
+                        color: httpRun.success ? 'var(--status-success)' : 'var(--status-error)',
+                        fontSize: '12px',
+                        fontWeight: 500
+                      }}>
+                        {httpRun.statusCode || (httpRun.success ? 'OK' : 'FAIL')}
                       </span>
-                      {httpRun.statusCode && ` ${httpRun.statusCode}`}
-                      {httpRun.totalMs !== undefined && ` (${httpRun.totalMs}ms)`}
+                      {httpRun.totalMs !== undefined && (
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                          {httpRun.totalMs}ms
+                        </span>
+                      )}
                     </div>
                   ) : (
-                    <span style={{ color: '#999' }}>-</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>-</span>
                   )}
                 </td>
-                <td style={{ padding: '0.75rem', border: '1px solid #ddd' }}>
+                <td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className={`status-indicator ${statusIndicator}`}></span>
+                    <span className={`terminal-badge ${statusIndicator === 'success' ? 'success' : 'error'}`}>
+                      {getStatusText(overallSuccess)}
+                    </span>
+                  </div>
+                </td>
+                <td>
                   {latestRun ? (
-                    <div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                       {new Date(latestRun.completedAt).toLocaleString()}
                     </div>
                   ) : (
-                    <span style={{ color: '#999' }}>Never</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Never</span>
                   )}
                 </td>
-                <td style={{ padding: '0.75rem', border: '1px solid #ddd' }}>
+                <td style={{ textAlign: 'right' }}>
                   <button
-                    onClick={() => handleDelete(domain.id)}
-                    style={{
-                      padding: '0.25rem 0.5rem',
-                      background: '#dc3545',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem'
-                    }}
+                    className="terminal-button danger"
+                    style={{ fontSize: '11px', padding: '0.25rem 0.5rem' }}
+                    onClick={(e) => handleDelete(e, domain.id)}
                   >
-                    Delete
+                    DELETE
                   </button>
                 </td>
               </tr>

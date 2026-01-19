@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { domainsApi, websiteInfoApi } from '../services/api';
-import type { CreateDomainRequest, WebsiteInfo } from '../types';
+import WebsiteInfoCard from './WebsiteInfoCard';
+import type { WebsiteInfo } from '../types';
+import '../App.css';
 
 interface DomainFormProps {
   onDomainAdded?: () => void;
@@ -12,20 +14,35 @@ export default function DomainForm({ onDomainAdded }: DomainFormProps) {
   const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [websiteInfo, setWebsiteInfo] = useState<WebsiteInfo | null>(null);
+  const [preview, setPreview] = useState<WebsiteInfo | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
+  const extractDomain = (input: string): string => {
+    // Remove protocol, www, and trailing slashes
+    let domain = input.trim().toLowerCase();
+    domain = domain.replace(/^https?:\/\//, '');
+    domain = domain.replace(/^www\./, '');
+    domain = domain.replace(/\/.*$/, '');
+    domain = domain.split(':')[0]; // Remove port if present
+    return domain;
+  };
+
   const handlePreview = async () => {
-    if (!url.trim()) return;
+    const domain = extractDomain(url);
+    if (!domain) {
+      setError('Please enter a valid domain or URL');
+      return;
+    }
 
     setPreviewLoading(true);
     setError(null);
+    setPreview(null);
+
     try {
-      const info = await websiteInfoApi.get(url.trim());
-      setWebsiteInfo(info);
+      const info = await websiteInfoApi.get(domain);
+      setPreview(info);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch website info');
-      setWebsiteInfo(null);
+      setError(err.response?.data?.message || err.message || 'Failed to fetch website info');
     } finally {
       setPreviewLoading(false);
     }
@@ -33,140 +50,140 @@ export default function DomainForm({ onDomainAdded }: DomainFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim()) return;
+    
+    const domain = extractDomain(url);
+    if (!domain) {
+      setError('Please enter a valid domain or URL');
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      const request: CreateDomainRequest = {
-        name: url.trim(),
+      await domainsApi.create({
+        name: domain,
         intervalMinutes,
-        enabled,
-      };
+        enabled
+      });
 
-      await domainsApi.create(request);
       setUrl('');
-      setWebsiteInfo(null);
+      setPreview(null);
       onDomainAdded?.();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create domain');
+      setError(err.response?.data?.message || err.message || 'Failed to create domain');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ marginBottom: '2rem', padding: '1.5rem', border: '1px solid #ddd', borderRadius: '8px' }}>
-      <h2 style={{ marginTop: 0 }}>Add Domain to Monitor</h2>
-      
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-            Domain/URL:
-          </label>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+    <div>
+      <form onSubmit={handleSubmit} style={{ marginBottom: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto auto', gap: '1rem', marginBottom: '1rem' }}>
+          <div>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '0.5rem', 
+              fontSize: '12px',
+              color: 'var(--text-secondary)',
+              fontWeight: 500,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              Domain/URL
+            </label>
             <input
               type="text"
+              className="terminal-input"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="example.com or https://example.com"
-              style={{ flex: 1, padding: '0.5rem', fontSize: '1rem' }}
+              placeholder="https://example.com or example.com"
+              disabled={loading}
             />
+          </div>
+
+          <div>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '0.5rem', 
+              fontSize: '12px',
+              color: 'var(--text-secondary)',
+              fontWeight: 500,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              Interval
+            </label>
+            <select
+              className="terminal-select"
+              value={intervalMinutes}
+              onChange={(e) => setIntervalMinutes(Number(e.target.value))}
+              disabled={loading}
+              style={{ width: '100%' }}
+            >
+              <option value={1}>1 minute</option>
+              <option value={5}>5 minutes</option>
+              <option value={15}>15 minutes</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
             <button
               type="button"
+              className="terminal-button"
               onClick={handlePreview}
-              disabled={previewLoading || !url.trim()}
-              style={{ padding: '0.5rem 1rem', cursor: previewLoading ? 'wait' : 'pointer' }}
+              disabled={loading || previewLoading || !url.trim()}
+              style={{ width: '100%' }}
             >
-              {previewLoading ? 'Loading...' : 'Preview'}
+              {previewLoading ? 'LOADING...' : 'PREVIEW'}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+            <button
+              type="submit"
+              className="terminal-button primary"
+              disabled={loading || !url.trim()}
+              style={{ width: '100%' }}
+            >
+              {loading ? 'ADDING...' : 'ADD DOMAIN'}
             </button>
           </div>
         </div>
 
-        {websiteInfo && (
-          <div style={{ marginBottom: '1rem', padding: '1rem', background: '#f0f0f0', borderRadius: '4px' }}>
-            <h3 style={{ marginTop: 0 }}>Website Information</h3>
-            <p><strong>Domain:</strong> {websiteInfo.domain}</p>
-            {websiteInfo.ipAddresses.length > 0 && (
-              <p><strong>IP Addresses:</strong> {websiteInfo.ipAddresses.join(', ')}</p>
-            )}
-            {websiteInfo.dnsRecords.length > 0 && (
-              <div>
-                <strong>DNS Records:</strong>
-                <ul>
-                  {websiteInfo.dnsRecords.map((record, idx) => (
-                    <li key={idx}>{record.type}: {record.value}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {websiteInfo.tlsInfo && (
-              <div>
-                <strong>TLS Certificate:</strong>
-                <ul>
-                  <li>Valid: {websiteInfo.tlsInfo.isValid ? 'Yes' : 'No'}</li>
-                  {websiteInfo.tlsInfo.issuer && <li>Issuer: {websiteInfo.tlsInfo.issuer}</li>}
-                  {websiteInfo.tlsInfo.daysUntilExpiry !== undefined && (
-                    <li>Days until expiry: {websiteInfo.tlsInfo.daysUntilExpiry}</li>
-                  )}
-                  {websiteInfo.tlsInfo.errorMessage && (
-                    <li style={{ color: 'red' }}>Error: {websiteInfo.tlsInfo.errorMessage}</li>
-                  )}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-            Check Interval:
-          </label>
-          <select
-            value={intervalMinutes}
-            onChange={(e) => setIntervalMinutes(Number(e.target.value))}
-            style={{ padding: '0.5rem', fontSize: '1rem' }}
-          >
-            <option value={1}>1 minute</option>
-            <option value={5}>5 minutes</option>
-            <option value={15}>15 minutes</option>
-          </select>
-        </div>
-
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <label style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '0.5rem',
+            cursor: 'pointer',
+            fontSize: '13px',
+            color: 'var(--text-primary)'
+          }}>
             <input
               type="checkbox"
               checked={enabled}
               onChange={(e) => setEnabled(e.target.checked)}
+              disabled={loading}
+              style={{ cursor: 'pointer' }}
             />
             <span>Enabled</span>
           </label>
         </div>
-
-        {error && (
-          <div style={{ marginBottom: '1rem', padding: '0.5rem', background: '#fee', color: '#c00', borderRadius: '4px' }}>
-            {error}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading || !url.trim()}
-          style={{
-            padding: '0.75rem 1.5rem',
-            fontSize: '1rem',
-            background: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: loading ? 'wait' : 'pointer'
-          }}
-        >
-          {loading ? 'Adding...' : 'Add Domain'}
-        </button>
       </form>
+
+      {error && (
+        <div className="terminal-error" style={{ marginBottom: '1rem' }}>
+          {error}
+        </div>
+      )}
+
+      {preview && (
+        <div style={{ marginTop: '1rem' }}>
+          <WebsiteInfoCard info={preview} />
+        </div>
+      )}
     </div>
   );
 }

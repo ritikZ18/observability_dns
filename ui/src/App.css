@@ -1,17 +1,339 @@
-* {
-  box-sizing: border-box;
+/* App-level terminal styling */
+.app-container {
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Terminal header */
+.terminal-header {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+.terminal-header .prompt {
+  color: var(--green-bright);
+  font-weight: 600;
+}
+
+.terminal-header .command {
+  color: var(--text-primary);
+}
+
+.terminal-header .path {
+  color: var(--blue-bright);
+}
+
+/* Status indicators */
+.status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.status-indicator.success {
+  background-color: var(--status-success);
+  box-shadow: 0 0 8px var(--status-success);
+}
+
+.status-indicator.warning {
+  background-color: var(--status-warning);
+  box-shadow: 0 0 8px var(--status-warning);
+}
+
+.status-indicator.error {
+  background-color: var(--status-error);
+  box-shadow: 0 0 8px var(--status-error);
+}
+
+.status-indicator.info {
+  background-color: var(--status-info);
+  box-shadow: 0 0 8px var(--status-info);
+}
+
+.status-indicator.unknown {
+  background-color: var(--text-muted);
+}
+
+/* Terminal-style card */
+.terminal-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.terminal-card:hover {
+  border-color: var(--border-hover);
+}
+
+.terminal-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.terminal-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.terminal-card-title::before {
+  content: '▶';
+  color: var(--green-bright);
+  font-size: 10px;
+}
+
+/* Terminal-style table */
+.terminal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.terminal-table thead {
+  background: var(--bg-tertiary);
+}
+
+.terminal-table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-color);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.terminal-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.terminal-table tbody tr {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.terminal-table tbody tr:hover {
+  background-color: var(--bg-hover);
+}
+
+.terminal-table tbody tr:active {
+  background-color: var(--bg-tertiary);
+}
+
+/* Terminal-style button */
+.terminal-button {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+  font-weight: 500;
+}
+
+.terminal-button:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.terminal-button:active {
+  background: var(--bg-tertiary);
+}
+
+.terminal-button.primary {
+  background: var(--blue);
+  color: var(--bg-primary);
+  border-color: var(--blue);
+}
+
+.terminal-button.primary:hover {
+  background: var(--blue-bright);
+  border-color: var(--blue-bright);
+}
+
+.terminal-button.danger {
+  background: var(--red);
+  color: var(--bg-primary);
+  border-color: var(--red);
+}
+
+.terminal-button.danger:hover {
+  background: var(--red-bright);
+  border-color: var(--red-bright);
+}
+
+.terminal-button.success {
+  background: var(--green);
+  color: var(--bg-primary);
+  border-color: var(--green);
+}
+
+.terminal-button.success:hover {
+  background: var(--green-bright);
+  border-color: var(--green-bright);
+}
+
+/* Terminal-style input */
+.terminal-input {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: 3px;
+  width: 100%;
+  transition: border-color 0.15s ease;
+}
+
+.terminal-input:focus {
+  border-color: var(--cursor-color);
+  outline: none;
+}
+
+.terminal-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Terminal-style select */
+.terminal-select {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.terminal-select:focus {
+  border-color: var(--cursor-color);
+  outline: none;
+}
+
+/* Terminal badge */
+.terminal-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.terminal-badge.success {
+  background: var(--status-success);
+  color: var(--bg-primary);
+}
+
+.terminal-badge.error {
+  background: var(--status-error);
+  color: var(--bg-primary);
+}
+
+.terminal-badge.warning {
+  background: var(--status-warning);
+  color: var(--bg-primary);
+}
+
+.terminal-badge.info {
+  background: var(--status-info);
+  color: var(--bg-primary);
+}
+
+/* Terminal grid layout */
+.terminal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Terminal code block */
+.terminal-code {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  padding: 1rem;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  overflow-x: auto;
+  color: var(--text-primary);
+}
+
+/* Loading spinner - terminal style */
+.terminal-loading {
+  color: var(--green-bright);
+  font-size: 13px;
+}
+
+.terminal-loading::after {
+  content: '...';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60%, 100% { content: '...'; }
+}
+
+/* Error message - terminal style */
+.terminal-error {
+  background: var(--bg-tertiary);
+  border-left: 3px solid var(--status-error);
+  padding: 0.75rem 1rem;
+  color: var(--status-error);
+  font-size: 13px;
+  margin: 1rem 0;
+}
+
+/* Success message */
+.terminal-success {
+  background: var(--bg-tertiary);
+  border-left: 3px solid var(--status-success);
+  padding: 0.75rem 1rem;
+  color: var(--status-success);
+  font-size: 13px;
+  margin: 1rem 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .terminal-table {
+    font-size: 12px;
+  }
+  
+  .terminal-table th,
+  .terminal-table td {
+    padding: 0.5rem;
+  }
 }
