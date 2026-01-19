@@ -57,7 +57,7 @@ export default function BackupRestore() {
         'Click OK to clear, Cancel to keep existing data.'
       );
 
-      const response = await apiClient.post('/api/backup/import', {
+      await apiClient.post('/api/backup/import', {
         backupData,
         clearExisting
       });

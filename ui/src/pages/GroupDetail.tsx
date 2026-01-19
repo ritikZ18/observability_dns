@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { groupsApi, domainsApi, probeRunsApi, incidentsApi } from '../services/api';
-import type { GroupDetail as GroupDetailType, Domain, ProbeRun } from '../types';
-import { IncidentStatus, CheckType } from '../types';
+import { groupsApi, probeRunsApi } from '../services/api';
+import type { GroupDetail as GroupDetailType } from '../types';
 import '../App.css';
 
 export default function GroupDetail() {
