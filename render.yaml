@@ -1,0 +1,64 @@
+services:
+  # API Web Service
+  - type: web
+    name: observability-dns-api
+    env: docker
+    dockerfilePath: ./src/api/Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+      - key: ConnectionStrings__DefaultConnection
+        fromDatabase:
+          name: observability-dns-db
+          property: connectionString
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        value: http://otel-collector:4317
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+      - key: SMTP__HOST
+        sync: false
+      - key: SMTP__PORT
+        value: "587"
+      - key: SMTP__USERNAME
+        sync: false
+      - key: SMTP__PASSWORD
+        sync: false
+      - key: SMTP__FROMEMAIL
+        sync: false
+
+  # Worker Background Service
+  - type: worker
+    name: observability-dns-worker
+    env: docker
+    dockerfilePath: ./src/worker/Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__DefaultConnection
+        fromDatabase:
+          name: observability-dns-db
+          property: connectionString
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        value: http://otel-collector:4317
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+      - key: SMTP__HOST
+        sync: false
+      - key: SMTP__PORT
+        value: "587"
+      - key: SMTP__USERNAME
+        sync: false
+      - key: SMTP__PASSWORD
+        sync: false
+
+databases:
+  - name: observability-dns-db
+    plan: starter
+    databaseName: observability_dns
+    user: observability
