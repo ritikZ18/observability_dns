@@ -78,7 +78,7 @@ observability_dns/
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/ritikZ18/observability_dns.git
 cd observability_dns
 ```
 
