@@ -63,8 +63,11 @@ builder.Services.AddOpenTelemetry()
     });
 
 // Add DbContext
+// Support both DATABASE_URL (Fly.io) and ConnectionStrings__DefaultConnection
+var connectionString = builder.Configuration["DATABASE_URL"] 
+    ?? builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ObservabilityDnsDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(connectionString));
 
 // Register services
 builder.Services.AddScoped<ObservabilityDns.Api.Services.DomainService>();

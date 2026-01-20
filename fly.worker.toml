@@ -1,0 +1,19 @@
+# Fly.io configuration for Worker service
+
+app = "observability-dns-worker"
+primary_region = "ams"
+
+[build]
+  dockerfile = "src/worker/Dockerfile"
+  docker_build_context = "."
+
+[env]
+  ASPNETCORE_ENVIRONMENT = "Production"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
+
+[processes]
+  app = "dotnet ObservabilityDns.Worker.dll"
