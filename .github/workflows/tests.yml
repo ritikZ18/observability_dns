@@ -1,0 +1,132 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Run unit tests
+      run: dotnet test tests/unit/ --no-build --verbosity normal
+    
+    - name: Generate coverage
+      run: dotnet test tests/unit/ --collect:"XPlat Code Coverage"
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        files: '**/coverage.cobertura.xml'
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: observability
+          POSTGRES_PASSWORD: observability_test
+          POSTGRES_DB: observability_dns_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Run integration tests
+      run: dotnet test tests/integration/ --no-build --verbosity normal
+      env:
+        ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=observability_dns_test;Username=observability;Password=observability_test
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install Playwright
+      run: |
+        cd tests/e2e
+        npm install
+    
+    - name: Install Playwright browsers
+      run: |
+        cd tests/e2e
+        npx playwright install --with-deps
+    
+    - name: Start services
+      run: |
+        docker compose up -d
+    
+    - name: Wait for services
+      run: |
+        sleep 30
+    
+    - name: Run E2E tests
+      run: |
+        cd tests/e2e
+        npm test
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: playwright-report
+        path: tests/e2e/playwright-report/
+        retention-days: 30
+
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Fly CLI
+      run: |
+        curl -L https://fly.io/install.sh | sh
+        echo "$HOME/.fly/bin" >> $GITHUB_PATH
+    
+    - name: Run smoke tests
+      run: |
+        chmod +x tests/smoke/*.sh
+        ./tests/smoke/run-smoke-tests.sh fly
+      env:
+        FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

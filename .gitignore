@@ -7,11 +7,13 @@ obj/
 *.dll
 *.exe
 *.pdb
-*.log
-*.vs/
-.vs/
-*.csproj.user
-*.csproj.bak
+*.dll.config
+*.cache
+project.lock.json
+project.fragment.lock.json
+artifacts/
+*.nupkg
+*.snupkg
 
 # Node.js
 node_modules/
@@ -20,51 +22,67 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 dist/
-build/
-.next/
-out/
+dist-ssr/
+*.local
 
-# IDEs
+# Testing
+coverage/
+*.coverage
+*.coveragexml
+test-results/
+playwright-report/
+playwright/.cache/
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.DS_Store
 
-# Docker
-.dockerignore
-
-# Environment files
+# Environment
 .env
 .env.local
 .env.*.local
-appsettings.Production.json
-appsettings.*.Production.json
+*.env
+
+# Docker
+*.log
+docker-compose.override.yml
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
 
-# Logs
-logs/
-*.log
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Test results
-TestResults/
-coverage/
-*.coverage
-*.trx
-
 # Build outputs
+build/
+out/
 *.zip
 *.tar.gz
+
+# Secrets
+secrets/
+*.pem
+*.key
+*.crt
 
 # Temporary files
 tmp/
 temp/
 *.tmp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Fly.io
+.fly/
+
+# Backup files
+*.bak
+*.backup
+
+# Migration files (keep structure, ignore generated)
+# Migrations are version controlled, but ignore snapshot files if any

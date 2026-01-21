@@ -460,7 +460,7 @@ fly deploy --config fly.toml --app observability-dns-api
 
 ## Complete Deployment Script
 
-Save this as `deploy-fly.sh`:
+The deployment script is located at `scripts/deployment/deploy-fly.sh`:
 
 ```bash
 #!/bin/bash
@@ -521,8 +521,8 @@ echo "  3. Open UI: https://observability-dns-ui.fly.dev"
 
 Make it executable:
 ```bash
-chmod +x deploy-fly.sh
-./deploy-fly.sh
+chmod +x scripts/deployment/deploy-fly.sh
+./scripts/deployment/deploy-fly.sh
 ```
 
 ---

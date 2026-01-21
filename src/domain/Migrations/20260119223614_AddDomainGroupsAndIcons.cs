@@ -47,12 +47,12 @@ namespace ObservabilityDns.Domain.Migrations
 
             // Add foreign key constraint
             migrationBuilder.AddForeignKey(
-                name: "FK_domains_domain_groups_group_id",
+                        name: "FK_domains_domain_groups_group_id",
                 table: "domains",
                 column: "group_id",
-                principalTable: "domain_groups",
-                principalColumn: "id",
-                onDelete: ReferentialAction.SetNull);
+                        principalTable: "domain_groups",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.SetNull);
 
             // Create indexes
             migrationBuilder.CreateIndex(

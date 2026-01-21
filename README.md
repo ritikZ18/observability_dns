@@ -281,3 +281,7 @@ docker compose exec postgres psql -U observability -d observability_dns
 ## License
 
 MIT
+
+## VIDEO DEMO
+
+https://www.youtube.com/watch?v=TBGWmAyZe6w

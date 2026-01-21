@@ -1,0 +1,65 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build outputs
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/build/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test results
+TestResults/
+coverage/
+*.coverage
+*.trx
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+
+# Documentation (not needed in image)
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github/
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Package files (handled separately in Dockerfile)
+**/package-lock.json
