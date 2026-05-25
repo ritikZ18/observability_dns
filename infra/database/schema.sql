@@ -9,9 +9,37 @@ CREATE TABLE IF NOT EXISTS domains (
     name VARCHAR(255) NOT NULL UNIQUE,
     enabled BOOLEAN NOT NULL DEFAULT true,
     interval_minutes INTEGER NOT NULL DEFAULT 5 CHECK (interval_minutes IN (1, 5, 15)),
+    icon VARCHAR(50),
+    group_id UUID,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Domain groups table (optional grouping for domains)
+CREATE TABLE IF NOT EXISTS domain_groups (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description VARCHAR(500),
+    color VARCHAR(7),
+    icon VARCHAR(50),
+    enabled BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Foreign key from domains -> domain_groups (optional)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'FK_domains_domain_groups_group_id'
+    ) THEN
+        ALTER TABLE domains
+            ADD CONSTRAINT "FK_domains_domain_groups_group_id"
+            FOREIGN KEY (group_id) REFERENCES domain_groups(id) ON DELETE SET NULL;
+    END IF;
+END $$;
 
 -- Checks table (defines what checks to run for each domain)
 CREATE TABLE IF NOT EXISTS checks (
@@ -101,3 +129,8 @@ CREATE INDEX IF NOT EXISTS idx_incidents_domain_id ON incidents(domain_id);
 CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);
 CREATE INDEX IF NOT EXISTS idx_notifications_status ON notifications(status);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at);
+
+-- Group-related indexes
+CREATE INDEX IF NOT EXISTS "IX_domain_groups_enabled" ON domain_groups(enabled);
+CREATE UNIQUE INDEX IF NOT EXISTS "IX_domain_groups_name" ON domain_groups(name);
+CREATE INDEX IF NOT EXISTS "IX_domains_group_id" ON domains(group_id);

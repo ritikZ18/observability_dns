@@ -11,65 +11,39 @@ namespace ObservabilityDns.Domain.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Create domain_groups table (if it doesn't exist)
-            migrationBuilder.CreateTable(
-                name: "domain_groups",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    color = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: true),
-                    icon = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
-                    enabled = table.Column<bool>(type: "boolean", nullable: false),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_domain_groups", x => x.id);
-                });
+            migrationBuilder.Sql(@"
+CREATE TABLE IF NOT EXISTS domain_groups (
+    id uuid NOT NULL,
+    name character varying(100) NOT NULL,
+    description character varying(500),
+    color character varying(7),
+    icon character varying(50),
+    enabled boolean NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
+    CONSTRAINT ""PK_domain_groups"" PRIMARY KEY (id)
+);");
 
-            // Add icon column to domains table (if it doesn't exist)
-            migrationBuilder.AddColumn<string>(
-                name: "icon",
-                table: "domains",
-                type: "character varying(50)",
-                maxLength: 50,
-                nullable: true);
+            migrationBuilder.Sql(@"ALTER TABLE domains ADD COLUMN IF NOT EXISTS icon character varying(50);");
+            migrationBuilder.Sql(@"ALTER TABLE domains ADD COLUMN IF NOT EXISTS group_id uuid;");
 
-            // Add group_id column to domains table (if it doesn't exist)
-            migrationBuilder.AddColumn<Guid>(
-                name: "group_id",
-                table: "domains",
-                type: "uuid",
-                nullable: true);
+            migrationBuilder.Sql(@"
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'FK_domains_domain_groups_group_id'
+    ) THEN
+        ALTER TABLE domains
+            ADD CONSTRAINT ""FK_domains_domain_groups_group_id""
+            FOREIGN KEY (group_id) REFERENCES domain_groups(id) ON DELETE SET NULL;
+    END IF;
+END $$;");
 
-            // Add foreign key constraint
-            migrationBuilder.AddForeignKey(
-                        name: "FK_domains_domain_groups_group_id",
-                table: "domains",
-                column: "group_id",
-                        principalTable: "domain_groups",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.SetNull);
-
-            // Create indexes
-            migrationBuilder.CreateIndex(
-                name: "IX_domain_groups_enabled",
-                table: "domain_groups",
-                column: "enabled");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_domain_groups_name",
-                table: "domain_groups",
-                column: "name",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_domains_group_id",
-                table: "domains",
-                column: "group_id");
+            migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_domain_groups_enabled"" ON domain_groups (enabled);");
+            migrationBuilder.Sql(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_domain_groups_name"" ON domain_groups (name);");
+            migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_domains_group_id"" ON domains (group_id);");
         }
 
         /// <inheritdoc />

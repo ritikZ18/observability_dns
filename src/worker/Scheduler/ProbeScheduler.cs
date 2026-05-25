@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using ObservabilityDns.Domain.DbContext;
 using ObservabilityDns.Domain.Entities;
 using Quartz;
+using Quartz.Impl.Matchers;
 using System.Text.Json;
 
 namespace ObservabilityDns.Worker.Scheduler;
@@ -51,23 +52,28 @@ public class ProbeScheduler : BackgroundService
 
         var domains = await dbContext.Domains
             .Include(d => d.Checks)
-            .Where(d => d.Enabled)
             .ToListAsync(cancellationToken);
 
-        foreach (var domain in domains)
+        var desired = new Dictionary<JobKey, (ObservabilityDns.Domain.Entities.Domain Domain, ObservabilityDns.Domain.Entities.Check Check)>();
+        foreach (var domain in domains.Where(d => d.Enabled))
         {
             foreach (var check in domain.Checks.Where(c => c.Enabled))
             {
                 var jobKey = new JobKey($"probe-{domain.Id}-{check.CheckType}", "probes");
-                var triggerKey = new TriggerKey($"trigger-{domain.Id}-{check.CheckType}", "probes");
+                desired[jobKey] = (domain, check);
+            }
+        }
 
-                // Check if job already exists
-                if (await _scheduler!.CheckExists(jobKey, cancellationToken))
-                {
-                    continue; // Job already scheduled
-                }
+        // Ensure all desired jobs exist and have the right interval
+        foreach (var (jobKey, pair) in desired)
+        {
+            var (domain, check) = pair;
+            var triggerKey = new TriggerKey($"trigger-{domain.Id}-{check.CheckType}", "probes");
 
-                // Create job
+            var desiredInterval = TimeSpan.FromMinutes(domain.IntervalMinutes);
+
+            if (!await _scheduler!.CheckExists(jobKey, cancellationToken))
+            {
                 var jobData = new JobDataMap
                 {
                     ["DomainId"] = domain.Id.ToString(),
@@ -81,18 +87,62 @@ public class ProbeScheduler : BackgroundService
                     .UsingJobData(jobData)
                     .Build();
 
-                // Create trigger based on interval
                 var trigger = TriggerBuilder.Create()
                     .WithIdentity(triggerKey)
                     .StartNow()
                     .WithSimpleSchedule(x => x
-                        .WithInterval(TimeSpan.FromMinutes(domain.IntervalMinutes))
+                        .WithInterval(desiredInterval)
                         .RepeatForever())
                     .Build();
 
                 await _scheduler.ScheduleJob(job, trigger, cancellationToken);
                 _logger.LogInformation("Scheduled probe job for {Domain} ({CheckType}) every {Interval} minutes",
                     domain.Name, check.CheckType, domain.IntervalMinutes);
+                continue;
+            }
+
+            var existingTrigger = await _scheduler.GetTrigger(triggerKey, cancellationToken);
+            if (existingTrigger is ISimpleTrigger simpleTrigger)
+            {
+                if (simpleTrigger.RepeatInterval != desiredInterval)
+                {
+                    var updatedTrigger = TriggerBuilder.Create()
+                        .WithIdentity(triggerKey)
+                        .StartNow()
+                        .WithSimpleSchedule(x => x
+                            .WithInterval(desiredInterval)
+                            .RepeatForever())
+                        .Build();
+
+                    await _scheduler.RescheduleJob(triggerKey, updatedTrigger, cancellationToken);
+                    _logger.LogInformation("Rescheduled probe job for {Domain} ({CheckType}) to {Interval} minutes",
+                        domain.Name, check.CheckType, domain.IntervalMinutes);
+                }
+            }
+            else if (existingTrigger == null)
+            {
+                var trigger = TriggerBuilder.Create()
+                    .WithIdentity(triggerKey)
+                    .ForJob(jobKey)
+                    .StartNow()
+                    .WithSimpleSchedule(x => x
+                        .WithInterval(desiredInterval)
+                        .RepeatForever())
+                    .Build();
+
+                await _scheduler.ScheduleJob(trigger, cancellationToken);
+                _logger.LogInformation("Added missing trigger for {Domain} ({CheckType})", domain.Name, check.CheckType);
+            }
+        }
+
+        // Clean up jobs for disabled/removed domains/checks
+        var existingJobs = await _scheduler!.GetJobKeys(GroupMatcher<JobKey>.GroupEquals("probes"), cancellationToken);
+        foreach (var jobKey in existingJobs)
+        {
+            if (!desired.ContainsKey(jobKey))
+            {
+                await _scheduler.DeleteJob(jobKey, cancellationToken);
+                _logger.LogInformation("Deleted obsolete probe job {JobKey}", jobKey.Name);
             }
         }
     }

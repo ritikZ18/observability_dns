@@ -3,7 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ObservabilityDns.Domain.DbContext;
 using ObservabilityDns.Worker.Scheduler;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Quartz;
 
@@ -27,7 +29,29 @@ builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
 // Add OpenTelemetry
 var otelEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://otel-collector:4317";
+var serviceVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
+
+builder.Logging.AddOpenTelemetry(options =>
+{
+    options.IncludeFormattedMessage = true;
+    options.IncludeScopes = true;
+    options.ParseStateValues = true;
+    options.SetResourceBuilder(
+        ResourceBuilder.CreateDefault().AddService(
+            serviceName: "ObservabilityDns.Worker",
+            serviceVersion: serviceVersion,
+            serviceInstanceId: Environment.MachineName));
+    options.AddOtlpExporter(exporterOptions =>
+    {
+        exporterOptions.Endpoint = new Uri(otelEndpoint);
+    });
+});
+
 builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService(
+        serviceName: "ObservabilityDns.Worker",
+        serviceVersion: serviceVersion,
+        serviceInstanceId: Environment.MachineName))
     .WithTracing(tracerProviderBuilder =>
     {
         tracerProviderBuilder
@@ -48,8 +72,11 @@ builder.Services.AddOpenTelemetry()
     });
 
 // Add DbContext
+// Support both DATABASE_URL (Fly.io) and ConnectionStrings__DefaultConnection
+var connectionString = builder.Configuration["DATABASE_URL"]
+    ?? builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ObservabilityDnsDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(connectionString));
 
 // Add HttpClient for HTTP probes
 builder.Services.AddHttpClient();

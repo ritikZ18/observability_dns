@@ -25,6 +25,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS final
 WORKDIR /app
 EXPOSE 8080
 
+# Healthcheck in docker-compose uses curl
+RUN apk add --no-cache curl
+
 # Create non-root user for security
 RUN addgroup -g 1000 -S appgroup && \
     adduser -u 1000 -S appuser -G appgroup

@@ -25,39 +25,44 @@ export default function Dashboard() {
   const loadSummary = async () => {
     try {
       const [domainsData, groupsData] = await Promise.all([
-        domainsApi.getAll(),
+        domainsApi.getAll(selectedGroupId),
         groupsApi.getAll().catch(() => []) // Groups are optional
       ]);
 
       setGroups(groupsData);
 
       // Load recent probe runs for summary
+      const latestRuns = await Promise.all(
+        domainsData.map(async (domain) => {
+          try {
+            const runs = await probeRunsApi.getByDomain(domain.id, undefined, 1);
+            return runs[0];
+          } catch {
+            return undefined;
+          }
+        })
+      );
+
       let healthyCount = 0;
       let unhealthyCount = 0;
       let totalRuns = 0;
 
-      for (const domain of domainsData) {
-        try {
-          const runs = await probeRunsApi.getByDomain(domain.id, undefined, 1);
-          if (runs.length > 0) {
-            totalRuns += runs.length;
-            const latestRun = runs[0];
-            if (latestRun.success) {
-              healthyCount++;
-            } else {
-              unhealthyCount++;
-            }
-          } else {
-            unhealthyCount++; // No runs yet = unknown
-          }
-        } catch (err) {
+      for (const run of latestRuns) {
+        if (!run) {
           unhealthyCount++;
+          continue;
         }
+        totalRuns++;
+        if (run.success) healthyCount++;
+        else unhealthyCount++;
       }
 
       // Load open incidents
       const incidents = await incidentsApi.getAll(IncidentStatus.OPEN);
-      const openIncidents = incidents.length;
+      const domainIds = new Set(domainsData.map(d => d.id));
+      const openIncidents = selectedGroupId
+        ? incidents.filter(i => domainIds.has(i.domainId)).length
+        : incidents.length;
 
       setSummary({
         totalDomains: domainsData.length,
@@ -77,7 +82,7 @@ export default function Dashboard() {
     loadSummary();
     const interval = setInterval(loadSummary, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedGroupId]);
 
   const handleDomainAdded = () => {
     loadSummary();

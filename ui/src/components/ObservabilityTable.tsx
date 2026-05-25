@@ -17,24 +17,21 @@ export default function ObservabilityTable({ onDomainClick, groupId }: Observabi
 
   const loadData = async () => {
     try {
-      const domainsData = await domainsApi.getAll();
-      // Filter by group if specified
-      const filteredDomains = groupId 
-        ? domainsData.filter(d => d.groupId === groupId)
-        : domainsData;
-      setDomains(filteredDomains);
+      const domainsData = await domainsApi.getAll(groupId);
+      setDomains(domainsData);
 
-      // Load recent probe runs for each domain (use filtered domains)
-      const runsMap = new Map<string, ProbeRun[]>();
-      for (const domain of filteredDomains) {
-        try {
-          const runs = await probeRunsApi.getByDomain(domain.id, undefined, 3);
-          runsMap.set(domain.id, runs);
-        } catch (err) {
-          // Ignore errors for individual domain runs
-        }
-      }
-      setProbeRuns(runsMap);
+      const runEntries = await Promise.all(
+        domainsData.map(async (domain) => {
+          try {
+            const runs = await probeRunsApi.getByDomain(domain.id, undefined, 3);
+            return [domain.id, runs] as const;
+          } catch {
+            return [domain.id, [] as ProbeRun[]] as const;
+          }
+        })
+      );
+
+      setProbeRuns(new Map(runEntries));
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
     } finally {

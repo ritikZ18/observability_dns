@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using ObservabilityDns.Domain.DbContext;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using System.Text.Json.Serialization;
 
@@ -22,11 +24,13 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Add CORS for UI
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? ["http://localhost:3000"];
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:3000")
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
@@ -40,7 +44,29 @@ builder.Services.AddHealthChecks()
 
 // Add OpenTelemetry
 var otelEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://otel-collector:4317";
+var serviceVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
+
+builder.Logging.AddOpenTelemetry(options =>
+{
+    options.IncludeFormattedMessage = true;
+    options.IncludeScopes = true;
+    options.ParseStateValues = true;
+    options.SetResourceBuilder(
+        ResourceBuilder.CreateDefault().AddService(
+            serviceName: "ObservabilityDns.Api",
+            serviceVersion: serviceVersion,
+            serviceInstanceId: Environment.MachineName));
+    options.AddOtlpExporter(exporterOptions =>
+    {
+        exporterOptions.Endpoint = new Uri(otelEndpoint);
+    });
+});
+
 builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService(
+        serviceName: "ObservabilityDns.Api",
+        serviceVersion: serviceVersion,
+        serviceInstanceId: Environment.MachineName))
     .WithTracing(tracerProviderBuilder =>
     {
         tracerProviderBuilder
@@ -88,45 +114,46 @@ app.UseCors();
 app.UseAuthorization();
 app.MapControllers();
 
+static Task WriteHealthResponse(HttpContext context, HealthReport report, bool includeDuration)
+{
+    context.Response.ContentType = "application/json";
+    var result = System.Text.Json.JsonSerializer.Serialize(new
+    {
+        status = report.Status.ToString(),
+        checks = report.Entries.Select(e => new
+        {
+            name = e.Key,
+            status = e.Value.Status.ToString(),
+            exception = e.Value.Exception?.Message,
+            duration = includeDuration ? e.Value.Duration.ToString() : null
+        })
+    });
+    return context.Response.WriteAsync(result);
+}
+
 // Health check endpoints
 app.MapHealthChecks("/healthz", new HealthCheckOptions
 {
     Predicate = _ => true,
-    ResponseWriter = async (context, report) =>
+    ResultStatusCodes =
     {
-        context.Response.ContentType = "application/json";
-        var result = System.Text.Json.JsonSerializer.Serialize(new
-        {
-            status = report.Status.ToString(),
-            checks = report.Entries.Select(e => new
-            {
-                name = e.Key,
-                status = e.Value.Status.ToString(),
-                exception = e.Value.Exception?.Message,
-                duration = e.Value.Duration.ToString()
-            })
-        });
-        await context.Response.WriteAsync(result);
-    }
+        [HealthStatus.Healthy] = StatusCodes.Status200OK,
+        [HealthStatus.Degraded] = StatusCodes.Status200OK,
+        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
+    },
+    ResponseWriter = (context, report) => WriteHealthResponse(context, report, includeDuration: true)
 });
 
 app.MapHealthChecks("/readyz", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready"),
-    ResponseWriter = async (context, report) =>
+    ResultStatusCodes =
     {
-        context.Response.ContentType = "application/json";
-        var result = System.Text.Json.JsonSerializer.Serialize(new
-        {
-            status = report.Status.ToString(),
-            checks = report.Entries.Select(e => new
-            {
-                name = e.Key,
-                status = e.Value.Status.ToString()
-            })
-        });
-        await context.Response.WriteAsync(result);
-    }
+        [HealthStatus.Healthy] = StatusCodes.Status200OK,
+        [HealthStatus.Degraded] = StatusCodes.Status200OK,
+        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
+    },
+    ResponseWriter = (context, report) => WriteHealthResponse(context, report, includeDuration: false)
 });
 
 app.Run();

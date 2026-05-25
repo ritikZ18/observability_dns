@@ -22,19 +22,41 @@ public class ProbeJob : IJob
 
     public async Task Execute(IJobExecutionContext context)
     {
+        var cancellationToken = context.CancellationToken;
         var jobData = context.JobDetail.JobDataMap;
         var domainId = Guid.Parse(jobData.GetString("DomainId")!);
-        var domainName = jobData.GetString("DomainName")!;
-        var checkId = Guid.Parse(jobData.GetString("CheckId")!);
         var checkType = jobData.GetString("CheckType")!;
-
-        _logger.LogInformation("Executing {CheckType} probe for {Domain}", checkType, domainName);
+        string? domainName = null;
 
         using var scope = _serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ObservabilityDnsDbContext>();
 
         try
         {
+            domainName = await dbContext.Domains
+                .Where(d => d.Id == domainId)
+                .Select(d => d.Name)
+                .SingleOrDefaultAsync(cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(domainName))
+            {
+                _logger.LogWarning("Skipping probe: domain {DomainId} not found", domainId);
+                return;
+            }
+
+            var checkId = await dbContext.Checks
+                .Where(c => c.DomainId == domainId && c.CheckType == checkType)
+                .Select(c => c.Id)
+                .SingleOrDefaultAsync(cancellationToken);
+
+            if (checkId == Guid.Empty)
+            {
+                _logger.LogWarning("Skipping probe: check {CheckType} not found for domain {Domain}", checkType, domainName);
+                return;
+            }
+
+            _logger.LogInformation("Executing {CheckType} probe for {Domain}", checkType, domainName);
+
             ProbeResult? result = null;
             var startedAt = DateTime.UtcNow;
 
@@ -43,20 +65,20 @@ public class ProbeJob : IJob
             {
                 case "DNS":
                     var dnsRunner = scope.ServiceProvider.GetRequiredService<IDnsProbeRunner>();
-                    var dnsResult = await dnsRunner.ResolveAsync(domainName);
+                    var dnsResult = await dnsRunner.ResolveAsync(domainName, cancellationToken);
                     result = dnsResult;
                     break;
 
                 case "TLS":
                     var tlsRunner = scope.ServiceProvider.GetRequiredService<ITlsProbeRunner>();
-                    var tlsResult = await tlsRunner.CheckCertificateAsync(domainName);
+                    var tlsResult = await tlsRunner.CheckCertificateAsync(domainName, cancellationToken: cancellationToken);
                     result = tlsResult;
                     break;
 
                 case "HTTP":
                     var httpRunner = scope.ServiceProvider.GetRequiredService<IHttpProbeRunner>();
                     var httpUrl = domainName.StartsWith("http") ? domainName : $"https://{domainName}";
-                    var httpResult = await httpRunner.CheckUrlAsync(httpUrl);
+                    var httpResult = await httpRunner.CheckUrlAsync(httpUrl, cancellationToken);
                     result = httpResult;
                     break;
             }
@@ -101,17 +123,17 @@ public class ProbeJob : IJob
             }
 
             dbContext.ProbeRuns.Add(probeRun);
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Probe completed for {Domain} ({CheckType}): Success={Success}, Duration={Duration}ms",
                 domainName, checkType, result.Success, result.Duration.TotalMilliseconds);
 
             // Check for incidents and create if needed
-            await CheckAndCreateIncidentsAsync(dbContext, domainId, checkId, checkType, result);
+            await CheckAndCreateIncidentsAsync(dbContext, domainId, checkId, checkType, result, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error executing probe job for {Domain} ({CheckType})", domainName, checkType);
+            _logger.LogError(ex, "Error executing probe job for {DomainId}/{DomainName} ({CheckType})", domainId, domainName, checkType);
         }
     }
 
@@ -120,14 +142,15 @@ public class ProbeJob : IJob
         Guid domainId,
         Guid checkId,
         string checkType,
-        ProbeResult result)
+        ProbeResult result,
+        CancellationToken cancellationToken)
     {
         if (result.Success)
         {
             // Resolve any open incidents for this check
             var openIncidents = await dbContext.Incidents
                 .Where(i => i.DomainId == domainId && i.CheckType == checkType && i.Status == "OPEN")
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             foreach (var incident in openIncidents)
             {
@@ -138,7 +161,7 @@ public class ProbeJob : IJob
 
             if (openIncidents.Any())
             {
-                await dbContext.SaveChangesAsync();
+                await dbContext.SaveChangesAsync(cancellationToken);
                 _logger.LogInformation("Resolved {Count} incidents for {CheckType} check", openIncidents.Count, checkType);
             }
         }
@@ -146,7 +169,9 @@ public class ProbeJob : IJob
         {
             // Check if incident already exists
             var existingIncident = await dbContext.Incidents
-                .FirstOrDefaultAsync(i => i.DomainId == domainId && i.CheckType == checkType && i.Status == "OPEN");
+                .FirstOrDefaultAsync(
+                    i => i.DomainId == domainId && i.CheckType == checkType && i.Status == "OPEN",
+                    cancellationToken);
 
             if (existingIncident == null)
             {
@@ -164,7 +189,7 @@ public class ProbeJob : IJob
                 };
 
                 dbContext.Incidents.Add(incident);
-                await dbContext.SaveChangesAsync();
+                await dbContext.SaveChangesAsync(cancellationToken);
 
                 _logger.LogWarning("Created incident for {Domain} ({CheckType}): {Reason}",
                     domainId, checkType, incident.Reason);
