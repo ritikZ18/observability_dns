@@ -76,7 +76,8 @@ async function requestWithTimeout(
   url: string,
   options: RequestInit,
   signal: AbortSignal,
-  timeoutMs = 20000
+  timeoutMs = 20000,
+  consumeResponse?: (response: Response) => Promise<void>
 ) {
   checkAbort(signal);
   const controller = new AbortController();
@@ -84,7 +85,10 @@ async function requestWithTimeout(
   signal.addEventListener('abort', onAbort, { once: true });
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...options, signal: controller.signal, cache: 'no-store' });
+    const response = await fetch(url, { ...options, signal: controller.signal, cache: 'no-store' });
+    // Keep the abort deadline active until the response body finishes streaming.
+    if (consumeResponse) await consumeResponse(response);
+    return response;
   } catch (error) {
     if (signal.aborted) throw new DOMException('Speed test cancelled', 'AbortError');
     if (controller.signal.aborted) throw new Error('Measurement timed out. Try again.');
@@ -109,15 +113,19 @@ async function ping(signal: AbortSignal) {
 
 async function download(bytes: number, signal: AbortSignal): Promise<SpeedSample> {
   const started = performance.now();
+  let receivedBytes = 0;
   const response = await requestWithTimeout(
     BASE + '/download?bytes=' + bytes + '&nonce=' + Math.random().toString(36).slice(2),
     { method: 'GET' },
-    signal
+    signal,
+    20000,
+    async (streamedResponse) => {
+      if (streamedResponse.ok) receivedBytes = (await streamedResponse.arrayBuffer()).byteLength;
+    }
   );
   if (!response.ok) throw new Error('Download request failed (' + response.status + ')');
-  const body = await response.arrayBuffer();
   const elapsedMs = performance.now() - started;
-  if (body.byteLength !== bytes) throw new Error('Incomplete download. Received ' + body.byteLength + ' bytes.');
+  if (receivedBytes !== bytes) throw new Error('Incomplete download. Received ' + receivedBytes + ' bytes.');
   return { phase: 'download', bytes, elapsedMs, mbps: speedMbps(bytes, elapsedMs) };
 }
 
