@@ -32,7 +32,8 @@ export type TestProgress = {
   samples: SpeedSample[];
 };
 
-const BASE = '/api/speed-test';
+const configuredBase = (import.meta.env.VITE_SPEED_TEST_BASE_URL as string | undefined)?.trim();
+const BASE = (configuredBase || '/api/speed-test').replace(/\/$/, '');
 const DOWNLOAD_SIZES = [512 * 1024, 2 * 1024 * 1024, 8 * 1024 * 1024];
 const UPLOAD_SIZES = [256 * 1024, 1024 * 1024, 4 * 1024 * 1024];
 
@@ -153,6 +154,9 @@ export async function runSpeedTest(
   signal: AbortSignal,
   onProgress: (progress: TestProgress) => void
 ): Promise<SpeedResult> {
+  if (!configuredBase && ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)) {
+    throw new Error('Local development would measure localhost, not Internet bandwidth. Configure VITE_SPEED_TEST_BASE_URL to point at a publicly reachable measurement API.');
+  }
   const samples: SpeedSample[] = [];
   const total = 8 + DOWNLOAD_SIZES.length + UPLOAD_SIZES.length;
   let completed = 0;
