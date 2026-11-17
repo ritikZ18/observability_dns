@@ -32,7 +32,7 @@ export type TestProgress = {
   samples: SpeedSample[];
 };
 
-const configuredBase = (import.meta.env.VITE_SPEED_TEST_BASE_URL as string | undefined)?.trim();
+const configuredBase = ((import.meta as any).env?.VITE_SPEED_TEST_BASE_URL as string | undefined)?.trim();
 const BASE = (configuredBase || '/api/speed-test').replace(/\/$/, '');
 const DOWNLOAD_SIZES = [512 * 1024, 2 * 1024 * 1024, 8 * 1024 * 1024];
 const UPLOAD_SIZES = [256 * 1024, 1024 * 1024, 4 * 1024 * 1024];
