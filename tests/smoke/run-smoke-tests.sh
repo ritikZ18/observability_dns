@@ -20,7 +20,7 @@ UI_URL=""
 case "$ENV" in
   local)
     API_URL="http://localhost:5000"
-    UI_URL="http://localhost:3000"
+    UI_URL="http://localhost:3002"
     ;;
   fly)
     API_URL="https://observability-dns-api.fly.dev"
@@ -57,11 +57,11 @@ test_endpoint() {
     
     if [ "$HTTP_CODE" = "$expected_status" ]; then
         echo -e "${GREEN}✓ PASS${NC} (HTTP $HTTP_CODE)"
-        ((PASSED++))
+        ((++PASSED))
         return 0
     else
         echo -e "${RED}✗ FAIL${NC} (Expected $expected_status, got $HTTP_CODE)"
-        ((FAILED++))
+        ((++FAILED))
         return 1
     fi
 }
@@ -72,7 +72,7 @@ echo "------------"
 
 test_endpoint "API Health Check" "$API_URL/healthz" 200
 test_endpoint "API Readiness" "$API_URL/readyz" 200
-test_endpoint "API Swagger" "$API_URL/swagger" 200
+test_endpoint "API Swagger" "$API_URL/swagger/index.html" 200
 
 # API Endpoints
 echo ""
@@ -81,6 +81,20 @@ echo "----------------"
 
 test_endpoint "Get Domains" "$API_URL/api/domains" 200
 test_endpoint "Get Groups" "$API_URL/api/groups" 200
+test_endpoint "Speed Test Ping" "$API_URL/api/speed-test/ping" 204
+test_endpoint "Speed Test Download" "$API_URL/api/speed-test/download?bytes=1024" 200
+
+echo -n "Testing Speed Test Upload... "
+UPLOAD_RESPONSE=$(printf 'local-speed-test' | curl -sS -X POST \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @- "$API_URL/api/speed-test/upload" || true)
+if [[ "$UPLOAD_RESPONSE" == *'"bytesReceived":16'* ]]; then
+    echo -e "${GREEN}✓ PASS${NC}"
+    ((++PASSED))
+else
+    echo -e "${RED}✗ FAIL${NC} (Unexpected response: $UPLOAD_RESPONSE)"
+    ((++FAILED))
+fi
 
 # UI Tests
 echo ""
@@ -88,6 +102,7 @@ echo "🌐 UI Tests"
 echo "-----------"
 
 test_endpoint "UI Homepage" "$UI_URL" 200
+test_endpoint "UI Speed Test Route" "$UI_URL/speed-test" 200
 
 # Summary
 echo ""

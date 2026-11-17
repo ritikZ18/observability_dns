@@ -137,6 +137,19 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* On-demand client-side network diagnostics */}
+        <div className="terminal-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', borderLeft: '3px solid var(--blue-bright)' }}>
+          <div>
+            <div className="terminal-card-title">Current Device Internet Speed Test</div>
+            <p style={{ marginTop: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Check download, upload, latency and jitter from this browser (not monitoring workers).
+            </p>
+          </div>
+          <button type="button" className="terminal-button primary" onClick={() => navigate('/speed-test')}>
+            OPEN SPEED TEST →
+          </button>
+        </div>
+
         {/* Summary Cards */}
         <div className="terminal-grid">
           <div className="terminal-card">

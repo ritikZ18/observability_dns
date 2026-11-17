@@ -15,6 +15,10 @@ WORKDIR /app
 COPY ui/package*.json ./
 RUN npm install && npm cache clean --force
 
+# Vite replaces VITE_* values at build time, not container runtime.
+ARG VITE_SPEED_TEST_BASE_URL
+ENV VITE_SPEED_TEST_BASE_URL=${VITE_SPEED_TEST_BASE_URL}
+
 # Copy source and build
 COPY ui/ .
 RUN npm run build && \
