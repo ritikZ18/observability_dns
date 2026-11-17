@@ -40,7 +40,7 @@ For compose development, environment variables must be passed into the UI contai
 
 The repository uses distinct Fly apps (observability-dns-ui and observability-dns-api). Do not assume the UI container can reach the API at Docker Compose's internal hostname "api"; that hostname resolves only when both services share the compose network.
 
-1. Deploy the updated API. Check GET https://YOUR-API/ api/speed-test/ping (without the space in the URL) returns HTTP 204.
+1. Deploy the updated API. Check GET https://YOUR-API.example.com/api/speed-test/ping returns HTTP 204.
 2. Allow the UI origin in the ASP.NET Core Cors:AllowedOrigins configuration. The repository includes the named observability-dns-ui.fly.dev origin; change/add your custom domain if necessary.
 3. Build/deploy the frontend with its remote API URL:
 
