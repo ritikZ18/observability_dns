@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import DomainDetail from './pages/DomainDetail';
 import GroupDetail from './pages/GroupDetail';
+import SpeedTest from './pages/SpeedTest';
 import './App.css';
 
 function App() {
@@ -11,6 +12,7 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/domain/:id" element={<DomainDetail />} />
         <Route path="/group/:id" element={<GroupDetail />} />
+        <Route path="/speed-test" element={<SpeedTest />} />
       </Routes>
     </BrowserRouter>
   );
