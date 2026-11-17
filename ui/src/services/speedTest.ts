@@ -37,6 +37,16 @@ const BASE = (configuredBase || '/api/speed-test').replace(/\/$/, '');
 const DOWNLOAD_SIZES = [512 * 1024, 2 * 1024 * 1024, 8 * 1024 * 1024];
 const UPLOAD_SIZES = [256 * 1024, 1024 * 1024, 4 * 1024 * 1024];
 
+export function isLocalSpeedTest() {
+  if (typeof window === 'undefined') return false;
+  try {
+    const target = new URL(BASE, window.location.origin);
+    return ['localhost', '127.0.0.1', '::1'].includes(target.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function checkAbort(signal: AbortSignal) {
   if (signal.aborted) throw new DOMException('Speed test cancelled', 'AbortError');
 }

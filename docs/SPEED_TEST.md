@@ -24,17 +24,23 @@ These are HTTP transfer measurements, not ICMP pings, not WAN-router measurement
 
 ## Docker compose / local development
 
-The Vite dev frontend serves localhost:3000, and the API serves localhost:5000. A test that downloads from localhost would be a **local loopback benchmark** and say nothing useful about Internet speed.
+The Compose Vite frontend serves localhost:3002, and the API serves localhost:5000. A test that downloads from localhost is a **local loopback benchmark** and says nothing useful about Internet speed.
 
-For that reason, the browser test runner explicitly refuses to run on localhost without a configured remote endpoint.
+Compose explicitly sets `VITE_SPEED_TEST_BASE_URL=/api/speed-test`, enabling local browser-to-API testing through the existing Vite proxy. The page labels this as `BROWSER → LOCAL API`, and the smoke suite verifies local ping, download, upload, and UI routing. Outside Compose, the browser runner still refuses to run on localhost without an explicitly configured endpoint, preventing accidental interpretation as Internet bandwidth.
 
-First, deploy the updated ASP.NET Core API to a remote, publicly reachable HTTPS origin. Then set in ui/.env.local (create this file locally; do not commit secrets):
+The Compose-only `VITE_API_PROXY_TARGET=http://api:8080` uses Docker service discovery. Do not use that hostname in browser-facing configuration: browsers continue to use localhost locally, while the production nginx image proxies `/api` to the API service. Deployment UI origins can be listed under `Cors:AllowedOrigins` or appended at runtime with a comma-separated `CORS_ALLOWED_ORIGINS` environment variable, for example `https://app.example.com,https://staging.example.com`.
+
+To measure against a remote, publicly reachable HTTPS origin instead, set in ui/.env.local (create this file locally; do not commit secrets):
 
     VITE_SPEED_TEST_BASE_URL=https://YOUR-REMOTE-API.example.com/api/speed-test
 
 Start Vite with npm run dev, or docker compose up --build ui.
 
-For compose development, environment variables must be passed into the UI container at runtime; add VITE_SPEED_TEST_BASE_URL to ui.environment in docker-compose.yml if using compose. In Vite production builds, the variable must be set at **build time**.
+For Compose development, override the local default when starting the stack if desired:
+
+    VITE_SPEED_TEST_BASE_URL=https://YOUR-REMOTE-API.example.com/api/speed-test ./start.sh
+
+In Vite production builds, the variable must be set at **build time**.
 
 ## Fly.io deployment (separate apps)
 

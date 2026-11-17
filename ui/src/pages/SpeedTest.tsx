@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { runSpeedTest, type SpeedResult, type TestProgress } from '../services/speedTest';
+import { isLocalSpeedTest, runSpeedTest, type SpeedResult, type TestProgress } from '../services/speedTest';
 import '../App.css';
 import './SpeedTest.css';
 
@@ -17,6 +17,7 @@ function metric(value: number | null, unit: string, precision = 1) {
 }
 
 export default function SpeedTest() {
+  const localMeasurement = isLocalSpeedTest();
   const [progress, setProgress] = useState<TestProgress>(initialProgress);
   const [result, setResult] = useState<SpeedResult | null>(null);
   const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error' | 'cancelled'>('idle');
@@ -96,7 +97,7 @@ export default function SpeedTest() {
             <h1>Current Device Speed Test</h1>
             <p>Measures the connection from this browser to the Observatory server—not from your website-monitoring worker.</p>
           </div>
-          <span className="speed-mode">BROWSER → INTERNET</span>
+          <span className="speed-mode">{localMeasurement ? 'BROWSER → LOCAL API' : 'BROWSER → INTERNET'}</span>
         </div>
 
         <section className="terminal-card speed-controls">
@@ -105,7 +106,9 @@ export default function SpeedTest() {
             <p className="speed-muted">
               {status === 'running'
                 ? 'Request ' + progress.completed + ' / ' + progress.total + ' • keep this tab active'
-                : 'This uses real download/upload traffic. Your network plan may count the test data.'}
+                : localMeasurement
+                  ? 'Local mode tests browser-to-API throughput on this host; it is not an Internet bandwidth result.'
+                  : 'This uses real download/upload traffic. Your network plan may count the test data.'}
             </p>
           </div>
           <div className="speed-control-buttons">
@@ -171,7 +174,7 @@ export default function SpeedTest() {
             <div className="terminal-card-header"><div className="terminal-card-title">Connection diagnostics</div></div>
             <dl className="speed-diagnostics">
               <div><dt>Measurement point</dt><dd>This browser</dd></div>
-              <div><dt>Server</dt><dd>Observatory API (same-origin proxy)</dd></div>
+              <div><dt>Server</dt><dd>{localMeasurement ? 'Local Observatory API (/api proxy)' : 'Observatory measurement API'}</dd></div>
               <div><dt>Loaded latency / download</dt><dd>{metric(result?.downloadLoadedLatencyMs ?? null, 'ms')}</dd></div>
               <div><dt>Loaded latency / upload</dt><dd>{metric(result?.uploadLoadedLatencyMs ?? null, 'ms')}</dd></div>
               <div><dt>Packet loss</dt><dd>Not available (requires WebRTC/UDP)</dd></div>
